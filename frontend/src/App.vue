@@ -3,6 +3,7 @@ import { onMounted, watch, ref, reactive, computed } from 'vue'
 import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { uploadFile } from './api/resources.js'
+import { onUnauthorized } from './api/http.js'
 import LoginView from './components/LoginView.vue'
 import Sidebar from './components/Sidebar.vue'
 import TopBar from './components/TopBar.vue'
@@ -29,6 +30,8 @@ let uploadId = 0
 
 onMounted(() => auth.checkSession())
 watch(() => auth.user, (user) => { if (user) files.loadDirectory('/') })
+
+onUnauthorized(() => { auth.user = null })
 
 async function handleFiles(fileList) {
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`

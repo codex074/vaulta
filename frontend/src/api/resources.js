@@ -1,3 +1,5 @@
+import { authorizedFetch } from './http.js'
+
 const SOURCE = 'share'
 
 async function apiError(response) {
@@ -12,15 +14,14 @@ function resourcesUrl(path, extraParams = {}) {
 }
 
 export async function listDirectory(path) {
-  const response = await fetch(resourcesUrl(path), { credentials: 'same-origin' })
+  const response = await authorizedFetch(resourcesUrl(path))
   if (!response.ok) throw await apiError(response)
   return response.json()
 }
 
 export async function makeDirectory(path) {
-  const response = await fetch(resourcesUrl(path, { override: 'false', isDir: 'true' }), {
+  const response = await authorizedFetch(resourcesUrl(path, { override: 'false', isDir: 'true' }), {
     method: 'POST',
-    credentials: 'same-origin',
   })
   if (!response.ok) throw await apiError(response)
 }
@@ -46,14 +47,13 @@ export function uploadFile(path, file, onProgress) {
 }
 
 export async function deleteItem(path) {
-  const response = await fetch(resourcesUrl(path), { method: 'DELETE', credentials: 'same-origin' })
+  const response = await authorizedFetch(resourcesUrl(path), { method: 'DELETE' })
   if (!response.ok) throw await apiError(response)
 }
 
 export async function bulkDelete(paths) {
-  const response = await fetch('/api/resources/bulk', {
+  const response = await authorizedFetch('/api/resources/bulk', {
     method: 'DELETE',
-    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(paths.map((path) => ({ source: SOURCE, path }))),
   })
@@ -62,9 +62,8 @@ export async function bulkDelete(paths) {
 }
 
 export async function moveItem(fromPath, toPath, action = 'move') {
-  const response = await fetch('/api/resources', {
+  const response = await authorizedFetch('/api/resources', {
     method: 'PATCH',
-    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       items: [{ fromSource: SOURCE, fromPath, toSource: SOURCE, toPath }],
