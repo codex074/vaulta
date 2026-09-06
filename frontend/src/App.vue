@@ -11,11 +11,13 @@ import FileListView from './components/FileListView.vue'
 import NewFolderDialog from './components/NewFolderDialog.vue'
 import UploadToast from './components/UploadToast.vue'
 import ContextMenu from './components/ContextMenu.vue'
+import Lightbox from './components/Lightbox.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
 const showNewFolder = ref(false)
 const activeMenu = ref(null)
+const previewing = ref(null)
 const uploads = reactive([])
 const searchQuery = ref('')
 const filteredEntries = computed(() =>
@@ -56,13 +58,14 @@ function onDrop(event) {
     <div class="main">
       <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" />
       <div class="content" @dragover.prevent @drop="onDrop">
-        <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" @menu="activeMenu = $event" />
-        <FileListView v-else :entries="filteredEntries" @menu="activeMenu = $event" />
+        <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" @menu="activeMenu = $event" @open="previewing = $event" />
+        <FileListView v-else :entries="filteredEntries" @menu="activeMenu = $event" @open="previewing = $event" />
       </div>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
     <UploadToast :uploads="uploads" />
     <ContextMenu v-if="activeMenu" :entry="activeMenu.entry" :path="activeMenu.path" @close="activeMenu = null" />
+    <Lightbox v-if="previewing" :entry="previewing" @close="previewing = null" />
   </div>
 </template>
 
