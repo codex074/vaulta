@@ -1,20 +1,44 @@
 <script setup>
-import { onMounted, watch, ref } from 'vue'
+import { onMounted, watch, ref, reactive } from 'vue'
 import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
+import { uploadFile } from './api/resources.js'
 import LoginView from './components/LoginView.vue'
 import Sidebar from './components/Sidebar.vue'
 import TopBar from './components/TopBar.vue'
 import FileGrid from './components/FileGrid.vue'
 import FileListView from './components/FileListView.vue'
 import NewFolderDialog from './components/NewFolderDialog.vue'
+import UploadToast from './components/UploadToast.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
 const showNewFolder = ref(false)
+const uploads = reactive([])
+let uploadId = 0
 
 onMounted(() => auth.checkSession())
 watch(() => auth.user, (user) => { if (user) files.loadDirectory('/') })
+
+async function handleFiles(fileList) {
+  const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
+  for (const file of Array.from(fileList)) {
+    const entry = reactive({ id: uploadId++, name: file.name, progress: 0, error: false })
+    uploads.push(entry)
+    try {
+      await uploadFile(`${base}${file.name}`, file, (pct) => { entry.progress = pct })
+    } catch {
+      entry.error = true
+    }
+  }
+  await files.loadDirectory(files.currentPath)
+  setTimeout(() => uploads.splice(0, uploads.length), 2000)
+}
+
+function onDrop(event) {
+  event.preventDefault()
+  if (event.dataTransfer.files.length) handleFiles(event.dataTransfer.files)
+}
 </script>
 
 <template>
@@ -23,12 +47,13 @@ watch(() => auth.user, (user) => { if (user) files.loadDirectory('/') })
     <Sidebar />
     <div class="main">
       <TopBar @new-folder="showNewFolder = true" />
-      <div class="content">
+      <div class="content" @dragover.prevent @drop="onDrop">
         <FileGrid v-if="files.viewMode === 'grid'" :entries="files.entries" />
         <FileListView v-else :entries="files.entries" />
       </div>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
+    <UploadToast :uploads="uploads" />
   </div>
 </template>
 
