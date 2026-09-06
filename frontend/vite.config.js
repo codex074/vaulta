@@ -8,6 +8,7 @@ export default defineConfig({
       '/api': {
         target: 'http://192.168.1.22:30334',
         changeOrigin: true,
+        cookieDomainRewrite: '',
       },
     },
   },
