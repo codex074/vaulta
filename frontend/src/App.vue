@@ -10,10 +10,12 @@ import FileGrid from './components/FileGrid.vue'
 import FileListView from './components/FileListView.vue'
 import NewFolderDialog from './components/NewFolderDialog.vue'
 import UploadToast from './components/UploadToast.vue'
+import ContextMenu from './components/ContextMenu.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
 const showNewFolder = ref(false)
+const activeMenu = ref(null)
 const uploads = reactive([])
 const searchQuery = ref('')
 const filteredEntries = computed(() =>
@@ -54,12 +56,13 @@ function onDrop(event) {
     <div class="main">
       <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" />
       <div class="content" @dragover.prevent @drop="onDrop">
-        <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" />
-        <FileListView v-else :entries="filteredEntries" />
+        <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" @menu="activeMenu = $event" />
+        <FileListView v-else :entries="filteredEntries" @menu="activeMenu = $event" />
       </div>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
     <UploadToast :uploads="uploads" />
+    <ContextMenu v-if="activeMenu" :entry="activeMenu.entry" :path="activeMenu.path" @close="activeMenu = null" />
   </div>
 </template>
 
