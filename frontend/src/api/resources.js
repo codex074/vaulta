@@ -88,6 +88,6 @@ export async function renameItem(path, newName) {
 }
 
 export function downloadUrl(path) {
-  const params = new URLSearchParams({ path, source: SOURCE })
+  const params = new URLSearchParams({ file: path, source: SOURCE })
   return `/api/resources/download?${params.toString()}`
 }

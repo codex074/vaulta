@@ -76,6 +76,6 @@ describe('resources API', () => {
   })
 
   it('downloadUrl builds a plain GET link', () => {
-    expect(downloadUrl('/Photos/a.jpg')).toBe('/api/resources/download?path=%2FPhotos%2Fa.jpg&source=share')
+    expect(downloadUrl('/Photos/a.jpg')).toBe('/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share')
   })
 })
