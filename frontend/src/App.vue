@@ -5,6 +5,8 @@ import { useFilesStore } from './stores/files.js'
 import LoginView from './components/LoginView.vue'
 import Sidebar from './components/Sidebar.vue'
 import TopBar from './components/TopBar.vue'
+import FileGrid from './components/FileGrid.vue'
+import FileListView from './components/FileListView.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
@@ -20,7 +22,8 @@ watch(() => auth.user, (user) => { if (user) files.loadDirectory('/') })
     <div class="main">
       <TopBar />
       <div class="content">
-        <p>{{ files.entries.length }} item(s) in {{ files.currentPath }} — grid/list rendering comes in Task 7.</p>
+        <FileGrid v-if="files.viewMode === 'grid'" :entries="files.entries" />
+        <FileListView v-else :entries="files.entries" />
       </div>
     </div>
   </div>
