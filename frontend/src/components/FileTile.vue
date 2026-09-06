@@ -18,6 +18,12 @@ function onClick() {
 
 <template>
   <div class="tile" :class="{ selected: isSelected }">
+    <input
+      type="checkbox"
+      class="select-box"
+      :checked="isSelected"
+      @click.stop="files.toggleSelect(fullPath)"
+    />
     <button class="dots" @click.stop="emit('menu', { entry, path: fullPath })">⋮</button>
     <div class="thumb" @click="onClick">{{ iconFor(entry) }}</div>
     <div class="name" :title="entry.name">{{ entry.name }}</div>
@@ -44,4 +50,6 @@ function onClick() {
 .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); }
 .dots { position: absolute; top: 6px; right: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 14px; }
+.select-box { position: absolute; top: 6px; left: 6px; opacity: 0; }
+.tile:hover .select-box, .tile.selected .select-box { opacity: 1; }
 </style>

@@ -49,6 +49,16 @@ function onDrop(event) {
   event.preventDefault()
   if (event.dataTransfer.files.length) handleFiles(event.dataTransfer.files)
 }
+
+const bulkError = ref('')
+async function onBulkDelete() {
+  bulkError.value = ''
+  try {
+    await files.deleteSelected()
+  } catch (err) {
+    bulkError.value = err.message || 'Some items could not be deleted.'
+  }
+}
 </script>
 
 <template>
@@ -57,6 +67,12 @@ function onDrop(event) {
     <Sidebar />
     <div class="main">
       <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" />
+      <div v-if="files.selected.size" class="bulk-bar">
+        <span>{{ files.selected.size }} selected</span>
+        <button @click="onBulkDelete">Delete</button>
+        <button @click="files.clearSelection()">Clear</button>
+        <span v-if="bulkError" class="bulk-error">{{ bulkError }}</span>
+      </div>
       <div class="content" @dragover.prevent @drop="onDrop">
         <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" @menu="activeMenu = $event" @open="previewing = $event" />
         <FileListView v-else :entries="filteredEntries" @menu="activeMenu = $event" @open="previewing = $event" />
@@ -73,6 +89,8 @@ function onDrop(event) {
 #app-shell { display: flex; min-height: 100vh; }
 .main { flex: 1; display: flex; flex-direction: column; }
 .content { padding: 20px; flex: 1; }
+.bulk-bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: #eaf1ff; border-bottom: 1px solid var(--border); font-size: 13px; }
+.bulk-error { color: #d92d20; }
 
 @media (max-width: 640px) {
   #app-shell { flex-direction: column; }
