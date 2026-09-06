@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, watch, ref, reactive } from 'vue'
+import { onMounted, watch, ref, reactive, computed } from 'vue'
 import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { uploadFile } from './api/resources.js'
@@ -15,6 +15,12 @@ const auth = useAuthStore()
 const files = useFilesStore()
 const showNewFolder = ref(false)
 const uploads = reactive([])
+const searchQuery = ref('')
+const filteredEntries = computed(() =>
+  !searchQuery.value
+    ? files.entries
+    : files.entries.filter((e) => e.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+)
 let uploadId = 0
 
 onMounted(() => auth.checkSession())
@@ -46,10 +52,10 @@ function onDrop(event) {
   <div v-else-if="auth.checked" id="app-shell">
     <Sidebar />
     <div class="main">
-      <TopBar @new-folder="showNewFolder = true" />
+      <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" />
       <div class="content" @dragover.prevent @drop="onDrop">
-        <FileGrid v-if="files.viewMode === 'grid'" :entries="files.entries" />
-        <FileListView v-else :entries="files.entries" />
+        <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" />
+        <FileListView v-else :entries="filteredEntries" />
       </div>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
