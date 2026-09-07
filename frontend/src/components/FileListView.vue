@@ -3,14 +3,18 @@ import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { showError } from '../errorToast.js'
 
-defineProps({ entries: { type: Array, required: true } })
+const props = defineProps({
+  entries: { type: Array, required: true },
+  disableOpen: { type: Boolean, default: false },
+})
 const emit = defineEmits(['open', 'menu'])
 const files = useFilesStore()
 
 function fullPath(entry) {
-  return `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${entry.name}`
+  return entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${entry.name}`
 }
 async function onClick(entry) {
+  if (props.disableOpen) return
   if (entry.type === 'directory') {
     try {
       await files.loadDirectory(fullPath(entry))
@@ -21,19 +25,31 @@ async function onClick(entry) {
     emit('open', { ...entry, path: fullPath(entry) })
   }
 }
+async function onStarClick(entry) {
+  try {
+    await files.toggleStar(entry)
+  } catch (err) {
+    showError(err.message || 'Could not update star.')
+  }
+}
 </script>
 
 <template>
   <table class="list">
-    <thead><tr><th></th><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+    <thead><tr><th></th><th></th><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead>
     <tbody>
-      <tr v-for="entry in entries" :key="entry.name">
+      <tr v-for="entry in entries" :key="entry.path || entry.name">
         <td class="select-col">
           <input
             type="checkbox"
             :checked="files.selected.has(fullPath(entry))"
             @click.stop="files.toggleSelect(fullPath(entry))"
           />
+        </td>
+        <td class="star-col">
+          <button v-if="!disableOpen" class="star" @click.stop="onStarClick(entry)">
+            {{ files.pinnedNames.has(entry.name) ? '⭐' : '☆' }}
+          </button>
         </td>
         <td @click="onClick(entry)">{{ iconFor(entry) }} {{ entry.name }}</td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
@@ -48,7 +64,8 @@ async function onClick(entry) {
 .list { width: 100%; border-collapse: collapse; }
 .list th { text-align: left; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 8px 16px; }
 .list td { padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
-.list td:nth-child(2) { cursor: pointer; }
+.list td:nth-child(3) { cursor: pointer; }
 .list button { border: none; background: none; color: var(--text-muted); }
-.select-col { width: 32px; }
+.select-col, .star-col { width: 32px; }
+.star { font-size: 13px; }
 </style>

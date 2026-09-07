@@ -4,14 +4,21 @@ import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { showError } from '../errorToast.js'
 
-const props = defineProps({ entry: { type: Object, required: true } })
+const props = defineProps({
+  entry: { type: Object, required: true },
+  disableOpen: { type: Boolean, default: false },
+})
 const emit = defineEmits(['open', 'menu'])
 const files = useFilesStore()
 
-const fullPath = computed(() => `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${props.entry.name}`)
+const fullPath = computed(() =>
+  props.entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${props.entry.name}`
+)
 const isSelected = computed(() => files.selected.has(fullPath.value))
+const isStarred = computed(() => files.pinnedNames.has(props.entry.name))
 
 async function onClick() {
+  if (props.disableOpen) return
   if (props.entry.type === 'directory') {
     try {
       await files.loadDirectory(fullPath.value)
@@ -20,6 +27,14 @@ async function onClick() {
     }
   } else {
     emit('open', { ...props.entry, path: fullPath.value })
+  }
+}
+
+async function onStarClick() {
+  try {
+    await files.toggleStar(props.entry)
+  } catch (err) {
+    showError(err.message || 'Could not update star.')
   }
 }
 </script>
@@ -33,6 +48,9 @@ async function onClick() {
       @click.stop="files.toggleSelect(fullPath)"
     />
     <button class="dots" @click.stop="emit('menu', { entry, path: fullPath })">⋮</button>
+    <button v-if="!disableOpen" class="star" :class="{ starred: isStarred }" @click.stop="onStarClick">
+      {{ isStarred ? '⭐' : '☆' }}
+    </button>
     <div class="thumb" @click="onClick">{{ iconFor(entry) }}</div>
     <div class="name" :title="entry.name">{{ entry.name }}</div>
     <div class="meta">
@@ -60,7 +78,10 @@ async function onClick() {
 .dots { position: absolute; top: 6px; right: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 14px; }
 .select-box { position: absolute; top: 6px; left: 6px; opacity: 0; }
 .tile:hover .select-box, .tile.selected .select-box { opacity: 1; }
+.star { position: absolute; bottom: 6px; right: 6px; border: none; background: transparent; font-size: 14px; opacity: 0; }
+.tile:hover .star, .star.starred { opacity: 1; }
 @media (hover: none) {
   .select-box { opacity: 1; }
+  .star { opacity: 1; }
 }
 </style>

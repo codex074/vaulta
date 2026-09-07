@@ -1,5 +1,8 @@
 <script setup>
-defineProps({ entries: { type: Array, required: true } })
+defineProps({
+  entries: { type: Array, required: true },
+  disableOpen: { type: Boolean, default: false },
+})
 defineEmits(['open', 'menu'])
 </script>
 
@@ -7,8 +10,9 @@ defineEmits(['open', 'menu'])
   <div class="grid">
     <FileTile
       v-for="entry in entries"
-      :key="entry.name"
+      :key="entry.path || entry.name"
       :entry="entry"
+      :disable-open="disableOpen"
       @open="$emit('open', $event)"
       @menu="$emit('menu', $event)"
     />
