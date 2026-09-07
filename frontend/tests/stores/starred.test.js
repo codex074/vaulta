@@ -35,7 +35,10 @@ describe('starred store', () => {
       if (path === '/') {
         return Promise.resolve({
           path: '/', source: 'share',
-          folders: [{ name: 'Photos', type: 'directory', size: 4096, modified: '2026-09-07T00:00:00Z' }],
+          folders: [
+            { name: 'Photos', type: 'directory', size: 4096, modified: '2026-09-07T00:00:00Z' },
+            { name: '.trash', type: 'directory', size: 4096, modified: '2026-09-07T00:00:00Z' },
+          ],
           files: [],
           pinnedItems: [],
         })
