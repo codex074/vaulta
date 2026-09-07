@@ -45,3 +45,11 @@ button {
   font-family: inherit;
   cursor: pointer;
 }
+
+:root {
+  --plyr-color-main: var(--accent);
+  --plyr-video-control-background-hover: var(--accent);
+  --plyr-badge-background: var(--accent);
+  --plyr-menu-background: var(--bg-elevated);
+  --plyr-menu-color: var(--text);
+}

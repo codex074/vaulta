@@ -1,10 +1,23 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import Plyr from 'plyr'
+import 'plyr/dist/plyr.css'
 import { downloadUrl, previewUrl } from '../api/resources.js'
 import { pickImageSource } from './lightboxSrc.js'
 
 const props = defineProps({ entry: { type: Object, required: true } })
 defineEmits(['close'])
+
+const videoEl = ref(null)
+let player = null
+onMounted(() => {
+  if (videoEl.value) {
+    player = new Plyr(videoEl.value, { speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } })
+  }
+})
+onBeforeUnmount(() => {
+  player?.destroy()
+})
 
 const kind = computed(() => {
   if (props.entry.type.startsWith('image/')) return 'image'
@@ -48,7 +61,7 @@ watch(
     <div class="frame">
       <button class="close" @click="$emit('close')">✕</button>
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
-      <video v-else-if="kind === 'video'" :src="src" controls autoplay />
+      <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
       <iframe v-else-if="kind === 'pdf'" :src="src" title="PDF preview" />
       <div v-else class="fallback">
         <p>{{ entry.name }}</p>
@@ -61,7 +74,10 @@ watch(
 <style scoped>
 .backdrop { position: fixed; inset: 0; background: rgba(15, 18, 25, 0.75); display: flex; align-items: center; justify-content: center; z-index: 30; }
 .frame { position: relative; max-width: 85vw; max-height: 85vh; background: var(--bg-elevated); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; justify-content: center; }
-.frame img, .frame video { max-width: 100%; max-height: 75vh; }
+.frame img { max-width: 100%; max-height: 75vh; }
+.frame :deep(.plyr) { max-width: 80vw; max-height: 75vh; }
+.frame :deep(.plyr__video-wrapper) { max-height: 75vh; }
+.frame :deep(video) { max-height: 75vh; }
 .frame iframe { width: 70vw; height: 80vh; border: none; }
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
 .fallback { text-align: center; }
