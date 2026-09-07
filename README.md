@@ -6,6 +6,11 @@ Pinia; packaged as a multi-stage Docker build (Vite build + a small Go
 disk-usage sidecar build → nginx serving the static SPA, reverse-proxying
 `/api/*` to FileBrowser Quantum and `/nasapi/*` to the sidecar).
 
+Vaulta treats FileBrowser's numeric `user.id` as the immutable account UID.
+The login username remains a credential, while a separate UID-keyed profile
+stores the user-editable display name. Existing users need no data migration:
+until they save a display name, their login username is displayed.
+
 ## Local development
 
 ```bash
@@ -53,6 +58,10 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 - Bind mount: `/mnt/tank/share:/srv/share:ro` — read-only, and required. The
   `nasapi` sidecar `statfs()`s this path to report real disk usage for the
   sidebar's storage bar; without the mount the storage endpoint fails
+- Bind mount: `/mnt/.ix-apps/app_mounts/nas-webui/config:/var/lib/vaulta` —
+  read-write and required for persistent UID-keyed display-name profiles. The
+  FileBrowser numeric user ID is the immutable UID; existing login usernames
+  remain unchanged and become the initial display name automatically
 - The container runs two processes, started by `docker/entrypoint.sh`: nginx
   (serving the SPA and reverse-proxying `/api/*` to FileBrowser Quantum) and a
   small `nasapi` binary listening on `127.0.0.1:9190`, which serves
@@ -73,6 +82,7 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 - `frontend/src/components/` — UI components
 - `docker/Dockerfile`, `docker/nginx.conf` — production container build and
   nginx reverse-proxy config
-- `docker/nasapi/` — the Go disk-usage sidecar serving `/nasapi/storage`
+- `docker/nasapi/` — the Go sidecar serving `/nasapi/storage` plus authenticated
+  UID profile endpoints under `/nasapi/profile*`
 - `docker/entrypoint.sh` — container entrypoint, starts both processes
   (`nasapi` in the background, then nginx in the foreground)

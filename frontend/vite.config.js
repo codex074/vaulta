@@ -15,8 +15,8 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         scope: '/',
-        background_color: '#14171c',
-        theme_color: '#14171c',
+        background_color: '#090d12',
+        theme_color: '#090d12',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -31,9 +31,13 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://192.168.1.22:30334',
+        target: process.env.VITE_API_TARGET || 'http://192.168.1.22:30334',
         changeOrigin: true,
         cookieDomainRewrite: '',
+      },
+      '/nasapi': {
+        target: process.env.VITE_NASAPI_TARGET || 'http://192.168.1.22:8090',
+        changeOrigin: true,
       },
     },
   },

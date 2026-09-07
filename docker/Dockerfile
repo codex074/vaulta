@@ -15,6 +15,6 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=nasapi-build /nasapi-bin /usr/local/bin/nasapi
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh && mkdir -p /var/lib/vaulta && chmod 0750 /var/lib/vaulta
 EXPOSE 8090
 ENTRYPOINT ["/entrypoint.sh"]

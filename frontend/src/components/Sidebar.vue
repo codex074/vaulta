@@ -3,19 +3,19 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import { getStorageUsage } from '../api/storage.js'
 import { formatSize } from './fileFormat.js'
-import ChangePasswordDialog from './ChangePasswordDialog.vue'
+import AccountSettingsDialog from './AccountSettingsDialog.vue'
 import ManageUsersDialog from './ManageUsersDialog.vue'
 
 defineProps({ view: { type: String, required: true } })
 const emit = defineEmits(['upload', 'navigate'])
 const auth = useAuthStore()
 const showAccountMenu = ref(false)
-const showChangePassword = ref(false)
+const showAccountSettings = ref(false)
 const showManageUsers = ref(false)
 
-function openChangePassword() {
+function openAccountSettings() {
   showAccountMenu.value = false
-  showChangePassword.value = true
+  showAccountSettings.value = true
 }
 
 function openManageUsers() {
@@ -87,21 +87,24 @@ onUnmounted(() => {
     <div class="account-wrapper">
       <button class="sidebar-item" :class="{ active: showAccountMenu }" @click="showAccountMenu = !showAccountMenu">
         <span class="sidebar-icon">👤</span>
-        <span class="sidebar-label">{{ auth.user?.username || 'Account' }}</span>
+        <span class="sidebar-label">{{ auth.user?.displayName || auth.user?.username || 'Account' }}</span>
       </button>
       <div v-if="showAccountMenu" class="account-backdrop" @click="showAccountMenu = false"></div>
       <div v-if="showAccountMenu" class="account-menu">
         <div class="account-menu-header">
-          {{ auth.user?.username }}
+          <div class="account-identity">
+            <strong>{{ auth.user?.displayName || auth.user?.username }}</strong>
+            <span>UID {{ auth.user?.uid }} · @{{ auth.user?.username }}</span>
+          </div>
           <span v-if="auth.user?.permissions?.admin" class="admin-badge">Admin</span>
         </div>
-        <button @click="openChangePassword">Change password</button>
+        <button @click="openAccountSettings">Account settings</button>
         <button v-if="auth.user?.permissions?.admin" @click="openManageUsers">Manage users</button>
         <button class="danger" @click="auth.signOut()">Sign out</button>
       </div>
     </div>
   </nav>
-  <ChangePasswordDialog v-if="showChangePassword" @close="showChangePassword = false" />
+  <AccountSettingsDialog v-if="showAccountSettings" @close="showAccountSettings = false" />
   <ManageUsersDialog v-if="showManageUsers" @close="showManageUsers = false" />
 </template>
 
@@ -186,6 +189,9 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
+.account-identity { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.account-identity strong { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-identity span { font-size: 10px; font-weight: 400; white-space: nowrap; }
 .admin-badge {
   background: var(--accent);
   color: var(--accent-contrast);
