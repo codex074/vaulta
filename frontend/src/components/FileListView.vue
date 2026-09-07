@@ -1,9 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
+import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
+
+const failedThumbs = reactive(new Set())
 
 const props = defineProps({
   entries: { type: Array, required: true },
@@ -116,7 +119,18 @@ async function onDrop(event, entry) {
             {{ entry.pinned ?? files.pinnedNames.has(entry.name) ? '⭐' : '☆' }}
           </button>
         </td>
-        <td @click="onClick(entry)">{{ iconFor(entry) }} {{ entry.displayName ?? entry.name }}</td>
+        <td class="name-col" @click="onClick(entry)">
+          <img
+            v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))"
+            class="row-thumb"
+            :src="previewUrl(fullPath(entry), 'small')"
+            :alt="entry.name"
+            loading="lazy"
+            @error="failedThumbs.add(fullPath(entry))"
+          />
+          <span v-else class="row-icon">{{ iconFor(entry) }}</span>
+          {{ entry.displayName ?? entry.name }}
+        </td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
         <td>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</td>
         <td><button @click.stop="emit('menu', { entry, path: fullPath(entry) })">⋮</button></td>
@@ -132,6 +146,8 @@ async function onDrop(event, entry) {
 .list td:nth-child(3) { cursor: pointer; }
 .list tr.dragging { opacity: 0.5; }
 .list tr.drop-target td { box-shadow: inset 0 0 0 2px var(--accent); }
+.row-thumb { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
+.row-icon { display: inline-block; width: 20px; text-align: center; margin-right: 4px; }
 .list button { border: none; background: none; color: var(--text-muted); }
 .select-col, .star-col { width: 32px; }
 .star { font-size: 13px; }

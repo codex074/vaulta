@@ -20,9 +20,9 @@ import { errorToasts } from '../errorToast.js'
   max-width: 320px;
 }
 .error-row {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b42318;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
   border-radius: var(--radius);
   padding: 10px 14px;
   font-size: 13px;

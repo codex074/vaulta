@@ -4,6 +4,7 @@ import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
 import { dragPaths, isValidDropTarget, hasDragPayload, isWithin, moveInto } from './dragMove.js'
 import { entryPath } from './pathHelpers.js'
+import ThemeToggle from './ThemeToggle.vue'
 
 const props = defineProps({
   entries: { type: Array, default: () => [] },
@@ -89,6 +90,7 @@ async function onDrop(event, path) {
     <button @click="files.toggleViewMode()">{{ files.viewMode === 'grid' ? '☰ List' : '▦ Grid' }}</button>
     <button @click="emit('upload')">⬆ Upload</button>
     <button @click="emit('new-folder')">+ New folder</button>
+    <ThemeToggle />
   </header>
 </template>
 

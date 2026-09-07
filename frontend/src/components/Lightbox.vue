@@ -1,6 +1,6 @@
 <script setup>
-import { computed } from 'vue'
-import { downloadUrl } from '../api/resources.js'
+import { computed, ref, watch } from 'vue'
+import { downloadUrl, previewUrl } from '../api/resources.js'
 
 const props = defineProps({ entry: { type: Object, required: true } })
 defineEmits(['close'])
@@ -12,13 +12,18 @@ const kind = computed(() => {
   return 'other'
 })
 const src = computed(() => downloadUrl(props.entry.path))
+const imagePreviewFailed = ref(false)
+watch(() => props.entry.path, () => { imagePreviewFailed.value = false })
+const imageSrc = computed(() =>
+  props.entry.hasPreview && !imagePreviewFailed.value ? previewUrl(props.entry.path, 'large') : src.value
+)
 </script>
 
 <template>
   <div class="backdrop" @click.self="$emit('close')">
     <div class="frame">
       <button class="close" @click="$emit('close')">✕</button>
-      <img v-if="kind === 'image'" :src="src" :alt="entry.name" />
+      <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" :src="src" controls autoplay />
       <iframe v-else-if="kind === 'pdf'" :src="src" title="PDF preview" />
       <div v-else class="fallback">

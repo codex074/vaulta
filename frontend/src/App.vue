@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { useStarredStore } from './stores/starred.js'
 import { useTrashStore } from './stores/trash.js'
+import { useThemeStore } from './stores/theme.js'
 import { uploadFile, makeDirectory } from './api/resources.js'
 import { onUnauthorized } from './api/http.js'
 import { showError } from './errorToast.js'
@@ -23,6 +24,8 @@ const auth = useAuthStore()
 const files = useFilesStore()
 const starred = useStarredStore()
 const trash = useTrashStore()
+const theme = useThemeStore()
+watch(() => theme.current, (value) => { document.documentElement.dataset.theme = value }, { immediate: true })
 const showNewFolder = ref(false)
 const activeMenu = ref(null)
 const previewing = ref(null)
@@ -207,8 +210,8 @@ async function onEmptyTrash() {
 }
 .main { flex: 1; display: flex; flex-direction: column; }
 .content { padding: 20px; flex: 1; }
-.bulk-bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: #eaf1ff; border-bottom: 1px solid var(--border); font-size: 13px; }
-.bulk-error { color: #d92d20; }
+.bulk-bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: var(--selected-bg); border-bottom: 1px solid var(--border); font-size: 13px; }
+.bulk-error { color: var(--danger); }
 .trash-bar { display: flex; justify-content: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--border); }
 .trash-bar button { border: 1px solid var(--border); background: var(--bg-elevated); border-radius: 8px; padding: 6px 12px; }
 .loading-bar { padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
