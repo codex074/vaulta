@@ -31,7 +31,11 @@ const filteredEntries = computed(() =>
 let uploadId = 0
 
 onMounted(() => auth.checkSession())
-watch(() => auth.user, (user) => { if (user) files.loadDirectory('/') })
+watch(() => auth.user, (user) => {
+  if (user) {
+    files.loadDirectory('/').catch((err) => showError(err.message || 'Could not load files.'))
+  }
+})
 
 onUnauthorized(() => { auth.user = null })
 

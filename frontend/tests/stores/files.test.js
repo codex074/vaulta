@@ -59,4 +59,12 @@ describe('files store', () => {
     expect(resources.bulkDelete).toHaveBeenCalledWith(['/a.jpg'])
     expect(store.selected.size).toBe(0)
   })
+
+  it('deleteSelected throws when some deletes fail', async () => {
+    resources.bulkDelete.mockResolvedValue({ succeeded: [], failed: [{ path: '/a.txt' }] })
+    resources.listDirectory.mockResolvedValue({ folders: [], files: [] })
+    const store = useFilesStore()
+    store.selected = new Set(['/a.txt'])
+    await expect(store.deleteSelected()).rejects.toThrow('/a.txt')
+  })
 })

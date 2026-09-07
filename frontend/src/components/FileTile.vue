@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
+import { showError } from '../errorToast.js'
 
 const props = defineProps({ entry: { type: Object, required: true } })
 const emit = defineEmits(['open', 'menu'])
@@ -10,9 +11,16 @@ const files = useFilesStore()
 const fullPath = computed(() => `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${props.entry.name}`)
 const isSelected = computed(() => files.selected.has(fullPath.value))
 
-function onClick() {
-  if (props.entry.type === 'directory') files.loadDirectory(fullPath.value)
-  else emit('open', { ...props.entry, path: fullPath.value })
+async function onClick() {
+  if (props.entry.type === 'directory') {
+    try {
+      await files.loadDirectory(fullPath.value)
+    } catch (err) {
+      showError(err.message || 'Could not open folder.')
+    }
+  } else {
+    emit('open', { ...props.entry, path: fullPath.value })
+  }
 }
 </script>
 
@@ -52,4 +60,7 @@ function onClick() {
 .dots { position: absolute; top: 6px; right: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 14px; }
 .select-box { position: absolute; top: 6px; left: 6px; opacity: 0; }
 .tile:hover .select-box, .tile.selected .select-box { opacity: 1; }
+@media (hover: none) {
+  .select-box { opacity: 1; }
+}
 </style>

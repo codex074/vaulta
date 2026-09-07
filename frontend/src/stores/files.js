@@ -45,8 +45,13 @@ export const useFilesStore = defineStore('files', {
     },
     async deleteSelected() {
       const paths = Array.from(this.selected)
-      await bulkDelete(paths)
+      const result = await bulkDelete(paths)
       await this.loadDirectory(this.currentPath)
+      const failed = result && Array.isArray(result.failed) ? result.failed : []
+      if (failed.length) {
+        const names = failed.map((f) => (typeof f === 'string' ? f : f.path || JSON.stringify(f))).join(', ')
+        throw new Error(`Could not delete: ${names}`)
+      }
     },
   },
 })

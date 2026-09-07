@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useFilesStore } from '../stores/files.js'
+import { showError } from '../errorToast.js'
 
 const emit = defineEmits(['new-folder', 'search'])
 const files = useFilesStore()
@@ -16,8 +17,12 @@ const crumbs = computed(() => {
   return result
 })
 
-function goTo(path) {
-  files.loadDirectory(path)
+async function goTo(path) {
+  try {
+    await files.loadDirectory(path)
+  } catch (err) {
+    showError(err.message || 'Could not open folder.')
+  }
 }
 </script>
 
