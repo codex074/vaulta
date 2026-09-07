@@ -10,6 +10,8 @@
   --danger-bg: #fef2f2;
   --danger-border: #fecaca;
   --selected-bg: #eaf1ff;
+  --success: #039855;
+  --warning: #f79009;
   --radius: 10px;
   --sidebar-width: 220px;
 }
@@ -26,6 +28,8 @@
   --danger-bg: #3a1f1f;
   --danger-border: #5c2a2a;
   --selected-bg: #1e2c47;
+  --success: #34d399;
+  --warning: #fbbf24;
 }
 
 * { box-sizing: border-box; }

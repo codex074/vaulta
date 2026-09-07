@@ -222,8 +222,8 @@ async function savePassword() {
   gap: 12px;
 }
 .status { margin: 0; font-size: 13px; }
-.error { color: #d92d20; }
-.success { color: #039855; }
+.error { color: var(--danger); }
+.success { color: var(--success); }
 .section-actions,
 .dialog-footer {
   display: flex;

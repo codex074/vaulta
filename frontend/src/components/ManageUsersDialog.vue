@@ -175,7 +175,7 @@ async function onDelete(user) {
 .dialog h4 { margin: 0 0 6px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
 .dialog input[type="text"], .dialog input[type="password"], .dialog input:not([type]) { padding: 10px; border: 1px solid var(--border); border-radius: 8px; width: 100%; margin-bottom: 8px; }
-.error { color: #d92d20; font-size: 13px; margin: 0; }
+.error { color: var(--danger); font-size: 13px; margin: 0; }
 .hint { font-size: 12px; color: var(--text-muted); margin: 0; }
 .section { border-top: 1px solid var(--border); padding-top: 12px; }
 .user-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -185,7 +185,7 @@ async function onDelete(user) {
 .user-identity small { color: var(--text-muted); font-size: 10px; white-space: nowrap; }
 .admin-badge { background: var(--accent); color: var(--accent-contrast); font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
 .you-badge { background: var(--border); color: var(--text-muted); font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
-.user-list button.danger { border: none; background: none; color: #d92d20; font-size: 12px; cursor: pointer; padding: 4px 6px; }
+.user-list button.danger { border: none; background: none; color: var(--danger); font-size: 12px; cursor: pointer; padding: 4px 6px; }
 .checkbox { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
 .checkbox input { width: auto; margin: 0; }
 .actions { display: flex; justify-content: flex-end; }

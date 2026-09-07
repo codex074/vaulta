@@ -31,8 +31,8 @@ const usagePercent = computed(() => {
   return Math.min(100, Math.round((usedBytes.value / totalBytes.value) * 100))
 })
 const fillColor = computed(() => {
-  if (usagePercent.value >= 90) return '#d92d20'
-  if (usagePercent.value >= 75) return '#f79009'
+  if (usagePercent.value >= 90) return 'var(--danger)'
+  if (usagePercent.value >= 75) return 'var(--warning)'
   return 'var(--accent)'
 })
 
@@ -211,7 +211,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .account-menu button:hover { background: var(--bg); }
-.account-menu .danger { color: #d92d20; }
+.account-menu .danger { color: var(--danger); }
 
 @media (max-width: 640px) {
   .sidebar {
