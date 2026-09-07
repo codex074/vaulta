@@ -49,6 +49,13 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 - Port: `8090`, published
 - `network_mode: host` — required so nginx can reach FileBrowser Quantum at
   `127.0.0.1:30334` without container-to-container networking
+- Bind mount: `/mnt/tank/share:/srv/share:ro` — read-only, and required. The
+  `nasapi` sidecar `statfs()`s this path to report real disk usage for the
+  sidebar's storage bar; without the mount the storage endpoint fails
+- The container runs two processes, started by `docker/entrypoint.sh`: nginx
+  (serving the SPA and reverse-proxying `/api/*` to FileBrowser Quantum) and a
+  small `nasapi` binary listening on `127.0.0.1:9190`, which serves
+  `/nasapi/storage` and is reverse-proxied by nginx alongside `/api/*`
 - The public Cloudflare Tunnel ingress rule for `nas.codex074.com` points at
   `http://localhost:8090` (this app), not at FileBrowser Quantum directly.
   FileBrowser Quantum's own UI remains reachable only on the LAN at
@@ -62,3 +69,6 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 - `frontend/src/components/` — UI components
 - `docker/Dockerfile`, `docker/nginx.conf` — production container build and
   nginx reverse-proxy config
+- `docker/nasapi/` — the Go disk-usage sidecar serving `/nasapi/storage`
+- `docker/entrypoint.sh` — container entrypoint, starts both processes
+  (`nasapi` in the background, then nginx in the foreground)

@@ -92,10 +92,29 @@ describe('trash API', () => {
     expect(items).toHaveLength(1)
     expect(items[0]).toMatchObject({
       name: '1__a.jpg',
+      displayName: 'a.jpg',
       trashPath: '/.trash/1__a.jpg',
       originalPath: '/Photos/a.jpg',
       deletedAt: 1,
+      hasMeta: true,
     })
+  })
+
+  it('listTrash keeps hasMeta true when the sidecar exists but its JSON is unparseable', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/.trash', source: 'share',
+      folders: [],
+      files: [
+        { name: '3__c.jpg', type: 'image/jpeg', size: 10, modified: '2026-09-07T00:00:00Z' },
+        { name: '3__c.jpg.trashmeta', type: 'text/plain', size: 4, modified: '2026-09-07T00:00:00Z' },
+      ],
+    })
+    resources.getFileText.mockResolvedValue('not json at all')
+    const items = await listTrash()
+    expect(items).toHaveLength(1)
+    expect(items[0].hasMeta).toBe(true)
+    expect(items[0].originalPath).toBeNull()
+    expect(items[0].deletedAt).toBeNull()
   })
 
   it('listTrash leaves originalPath/deletedAt null when a sidecar is missing', async () => {
@@ -107,12 +126,13 @@ describe('trash API', () => {
     const items = await listTrash()
     expect(items[0].originalPath).toBeNull()
     expect(items[0].deletedAt).toBeNull()
+    expect(items[0].hasMeta).toBe(false)
   })
 
   it('restoreFromTrash moves the item back and deletes its sidecar', async () => {
     resources.moveItem.mockResolvedValue(undefined)
     resources.deleteItem.mockResolvedValue(undefined)
-    await restoreFromTrash({ trashPath: '/.trash/1__a.jpg', originalPath: '/Photos/a.jpg' })
+    await restoreFromTrash({ trashPath: '/.trash/1__a.jpg', originalPath: '/Photos/a.jpg', hasMeta: true })
     expect(resources.moveItem).toHaveBeenCalledWith('/.trash/1__a.jpg', '/Photos/a.jpg')
     expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg.trashmeta')
   })
@@ -125,16 +145,24 @@ describe('trash API', () => {
 
   it('deleteForever deletes both the item and its sidecar', async () => {
     resources.deleteItem.mockResolvedValue(undefined)
-    await deleteForever({ trashPath: '/.trash/1__a.jpg', originalPath: '/Photos/a.jpg' })
+    await deleteForever({ trashPath: '/.trash/1__a.jpg', originalPath: '/Photos/a.jpg', hasMeta: true })
     expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg')
     expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg.trashmeta')
   })
 
   it('deleteForever skips the sidecar delete when there was no sidecar', async () => {
     resources.deleteItem.mockResolvedValue(undefined)
-    await deleteForever({ trashPath: '/.trash/2__b.jpg', originalPath: null })
+    await deleteForever({ trashPath: '/.trash/2__b.jpg', originalPath: null, hasMeta: false })
     expect(resources.deleteItem).toHaveBeenCalledTimes(1)
     expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/2__b.jpg')
+  })
+
+  it('deleteForever still removes a present-but-corrupt sidecar (hasMeta true, originalPath null)', async () => {
+    resources.deleteItem.mockResolvedValue(undefined)
+    await deleteForever({ trashPath: '/.trash/3__c.jpg', originalPath: null, hasMeta: true })
+    expect(resources.deleteItem).toHaveBeenCalledTimes(2)
+    expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/3__c.jpg')
+    expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/3__c.jpg.trashmeta')
   })
 
   it('emptyTrash deletes every listed item and collects failures into one error', async () => {
@@ -150,5 +178,24 @@ describe('trash API', () => {
       path === '/.trash/2__b.jpg' ? Promise.reject(new Error('locked')) : Promise.resolve()
     )
     await expect(emptyTrash()).rejects.toThrow('/.trash/2__b.jpg')
+  })
+
+  it('emptyTrash also sweeps an orphaned .trashmeta whose item is already gone', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/.trash', source: 'share',
+      folders: [],
+      files: [
+        { name: '1__a.jpg', type: 'image/jpeg', size: 1, modified: '2026-09-07T00:00:00Z' },
+        { name: '1__a.jpg.trashmeta', type: 'text/plain', size: 40, modified: '2026-09-07T00:00:00Z' },
+        { name: '9__gone.jpg.trashmeta', type: 'text/plain', size: 40, modified: '2026-09-07T00:00:00Z' },
+      ],
+    })
+    resources.getFileText.mockResolvedValue('{"originalPath":"/Photos/a.jpg","deletedAt":1}')
+    resources.deleteItem.mockResolvedValue(undefined)
+    await expect(emptyTrash()).resolves.toBeUndefined()
+    expect(resources.deleteItem).toHaveBeenCalledTimes(3)
+    expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg')
+    expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg.trashmeta')
+    expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/9__gone.jpg.trashmeta')
   })
 })

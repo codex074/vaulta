@@ -26,7 +26,7 @@ describe('starred store', () => {
     const store = useStarredStore()
     await store.loadStarred()
     expect(store.entries).toEqual([
-      { name: 'a.txt', type: 'text/plain', size: 1, modified: '2026-09-07T00:00:00Z', path: '/a.txt' },
+      { name: 'a.txt', type: 'text/plain', size: 1, modified: '2026-09-07T00:00:00Z', path: '/a.txt', pinned: true },
     ])
   })
 
@@ -56,7 +56,7 @@ describe('starred store', () => {
     const store = useStarredStore()
     await store.loadStarred()
     expect(store.entries).toEqual([
-      { name: 'c.jpg', type: 'image/jpeg', size: 2, modified: '2026-09-07T00:00:00Z', path: '/Photos/c.jpg' },
+      { name: 'c.jpg', type: 'image/jpeg', size: 2, modified: '2026-09-07T00:00:00Z', path: '/Photos/c.jpg', pinned: true },
     ])
     expect(resources.listDirectory).not.toHaveBeenCalledWith('/.trash')
   })

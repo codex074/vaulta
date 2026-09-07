@@ -15,7 +15,7 @@ const fullPath = computed(() =>
   props.entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${props.entry.name}`
 )
 const isSelected = computed(() => files.selected.has(fullPath.value))
-const isStarred = computed(() => files.pinnedNames.has(props.entry.name))
+const isStarred = computed(() => props.entry.pinned ?? files.pinnedNames.has(props.entry.name))
 
 async function onClick() {
   if (props.disableOpen) return
@@ -52,10 +52,10 @@ async function onStarClick() {
       {{ isStarred ? '⭐' : '☆' }}
     </button>
     <div class="thumb" @click="onClick">{{ iconFor(entry) }}</div>
-    <div class="name" :title="entry.name">{{ entry.name }}</div>
+    <div class="name" :title="entry.name">{{ entry.displayName ?? entry.name }}</div>
     <div class="meta">
       <span>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</span>
-      <span>{{ formatRelativeTime(entry.modified) }}</span>
+      <span>{{ formatRelativeTime(entry.deletedAt ?? entry.modified) }}</span>
     </div>
   </div>
 </template>

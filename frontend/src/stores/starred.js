@@ -10,7 +10,7 @@ async function walk(path) {
 
   const found = [...folders, ...files]
     .filter((entry) => pinned.has(entry.name))
-    .map((entry) => ({ ...entry, path: `${base}${entry.name}` }))
+    .map((entry) => ({ ...entry, path: `${base}${entry.name}`, pinned: true }))
 
   for (const folder of folders) {
     if (folder.name === '.trash') continue

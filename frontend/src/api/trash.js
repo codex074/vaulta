@@ -40,19 +40,22 @@ export async function listTrash() {
   const items = []
   for (const entry of itemEntries) {
     const trashPath = `/.trash/${entry.name}`
+    const hasMeta = metaNames.has(`${entry.name}.trashmeta`)
     let originalPath = null
     let deletedAt = null
-    if (metaNames.has(`${entry.name}.trashmeta`)) {
+    if (hasMeta) {
       try {
         const text = await getFileText(metaPathFor(trashPath))
         const parsed = JSON.parse(text)
         originalPath = parsed.originalPath
         deletedAt = parsed.deletedAt
       } catch {
-        // corrupt or unreadable sidecar — still show the item, just without restore info
+        // corrupt or unreadable sidecar — still show the item, just without restore info;
+        // hasMeta stays true so cleanup still removes the sidecar
       }
     }
-    items.push({ ...entry, path: trashPath, trashPath, originalPath, deletedAt })
+    const displayName = entry.name.replace(/^\d+__/, '')
+    items.push({ ...entry, path: trashPath, trashPath, originalPath, deletedAt, hasMeta, displayName })
   }
   return items
 }
@@ -69,7 +72,7 @@ export async function restoreFromTrash(item) {
 
 export async function deleteForever(item) {
   await deleteItem(item.trashPath)
-  if (!item.originalPath) return
+  if (!item.hasMeta) return
   try {
     await deleteItem(metaPathFor(item.trashPath))
   } catch (err) {
@@ -78,6 +81,13 @@ export async function deleteForever(item) {
 }
 
 export async function emptyTrash() {
+  const result = await listDirectory('/.trash')
+  const allEntries = [...(result.folders || []), ...(result.files || [])]
+  const itemNames = new Set(allEntries.filter((e) => !e.name.endsWith('.trashmeta')).map((e) => e.name))
+  const orphanMetaPaths = allEntries
+    .filter((e) => e.name.endsWith('.trashmeta') && !itemNames.has(e.name.slice(0, -'.trashmeta'.length)))
+    .map((e) => `/.trash/${e.name}`)
+
   const items = await listTrash()
   const failed = []
   for (const item of items) {
@@ -85,6 +95,13 @@ export async function emptyTrash() {
       await deleteForever(item)
     } catch (err) {
       failed.push({ path: item.trashPath, message: err.message })
+    }
+  }
+  for (const metaPath of orphanMetaPaths) {
+    try {
+      await deleteItem(metaPath)
+    } catch (err) {
+      failed.push({ path: metaPath, message: err.message })
     }
   }
   if (failed.length) {

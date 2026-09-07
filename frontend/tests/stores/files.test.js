@@ -112,4 +112,23 @@ describe('files store', () => {
     expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'a.txt', path: '/', source: 'share' }, 'remove')
     expect(store.pinnedNames.has('a.txt')).toBe(false)
   })
+
+  it('toggleStar uses a foreign entry\'s own parent path and pinned flag, leaving pinnedNames untouched', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    store.currentPath = '/'
+    store.pinnedNames = new Set(['a.txt'])
+    await store.toggleStar({ name: 'c.jpg', path: '/Photos/c.jpg', pinned: true })
+    expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'c.jpg', path: '/Photos', source: 'share' }, 'remove')
+    expect(store.pinnedNames).toEqual(new Set(['a.txt']))
+  })
+
+  it('toggleStar maps a root-level foreign entry back to the root path', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    store.currentPath = '/Documents'
+    await store.toggleStar({ name: 'c.jpg', path: '/c.jpg', pinned: true })
+    expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'c.jpg', path: '/', source: 'share' }, 'remove')
+    expect(store.pinnedNames).toEqual(new Set())
+  })
 })

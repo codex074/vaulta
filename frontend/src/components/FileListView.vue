@@ -48,12 +48,12 @@ async function onStarClick(entry) {
         </td>
         <td class="star-col">
           <button v-if="!disableOpen" class="star" @click.stop="onStarClick(entry)">
-            {{ files.pinnedNames.has(entry.name) ? '⭐' : '☆' }}
+            {{ entry.pinned ?? files.pinnedNames.has(entry.name) ? '⭐' : '☆' }}
           </button>
         </td>
-        <td @click="onClick(entry)">{{ iconFor(entry) }} {{ entry.name }}</td>
+        <td @click="onClick(entry)">{{ iconFor(entry) }} {{ entry.displayName ?? entry.name }}</td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
-        <td>{{ formatRelativeTime(entry.modified) }}</td>
+        <td>{{ formatRelativeTime(entry.deletedAt ?? entry.modified) }}</td>
         <td><button @click.stop="emit('menu', { entry, path: fullPath(entry) })">⋮</button></td>
       </tr>
     </tbody>

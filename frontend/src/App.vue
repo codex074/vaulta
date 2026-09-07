@@ -59,6 +59,7 @@ onUnauthorized(() => { auth.user = null })
 async function onNavigate(nextView) {
   view.value = nextView
   searchQuery.value = ''
+  files.clearSelection()
   try {
     if (nextView === 'starred') await starred.loadStarred()
     else if (nextView === 'trash') await trash.loadTrash()
@@ -136,6 +137,12 @@ async function onEmptyTrash() {
       <div v-if="view === 'trash'" class="trash-bar">
         <button @click="onEmptyTrash">Empty trash</button>
       </div>
+      <div
+        v-if="(view === 'starred' && starred.loading) || (view === 'trash' && trash.loading)"
+        class="loading-bar"
+      >
+        Loading…
+      </div>
       <div v-if="files.selected.size" class="bulk-bar">
         <span>{{ files.selected.size }} selected</span>
         <button @click="onBulkDelete">{{ view === 'trash' ? 'Delete forever' : 'Delete' }}</button>
@@ -182,6 +189,7 @@ async function onEmptyTrash() {
 .bulk-error { color: #d92d20; }
 .trash-bar { display: flex; justify-content: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--border); }
 .trash-bar button { border: 1px solid var(--border); background: var(--bg-elevated); border-radius: 8px; padding: 6px 12px; }
+.loading-bar { padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
 
 @media (max-width: 640px) {
   #app-shell { flex-direction: column; }

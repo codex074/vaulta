@@ -5,6 +5,11 @@ import { softDelete } from '../api/trash.js'
 
 const VIEW_MODE_KEY = 'nas-view-mode'
 
+function parentOf(path) {
+  const idx = path.lastIndexOf('/')
+  return idx <= 0 ? '/' : path.slice(0, idx)
+}
+
 export const useFilesStore = defineStore('files', {
   state: () => ({
     currentPath: '/',
@@ -48,12 +53,15 @@ export const useFilesStore = defineStore('files', {
       this.selected = new Set()
     },
     async toggleStar(entry) {
-      const isPinned = this.pinnedNames.has(entry.name)
-      await togglePinned({ name: entry.name, path: this.currentPath, source: 'share' }, isPinned ? 'remove' : 'add')
-      const next = new Set(this.pinnedNames)
-      if (isPinned) next.delete(entry.name)
-      else next.add(entry.name)
-      this.pinnedNames = next
+      const parentPath = entry.path ? parentOf(entry.path) : this.currentPath
+      const isPinned = entry.pinned ?? this.pinnedNames.has(entry.name)
+      await togglePinned({ name: entry.name, path: parentPath, source: 'share' }, isPinned ? 'remove' : 'add')
+      if (!entry.path) {
+        const next = new Set(this.pinnedNames)
+        if (isPinned) next.delete(entry.name)
+        else next.add(entry.name)
+        this.pinnedNames = next
+      }
     },
     async deleteSelected() {
       const paths = Array.from(this.selected)
