@@ -36,8 +36,8 @@ describe('auth store', () => {
     authApi.login.mockResolvedValue()
     authApi.getCurrentUser.mockResolvedValue({ username: 'codex' })
     const store = useAuthStore()
-    await store.signIn('codex', '571010074')
-    expect(authApi.login).toHaveBeenCalledWith('codex', '571010074')
+    await store.signIn('codex', 'hunter2')
+    expect(authApi.login).toHaveBeenCalledWith('codex', 'hunter2')
     expect(store.user.username).toBe('codex')
   })
 
