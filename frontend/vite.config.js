@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-master.svg'],
       manifest: {
-        name: 'NAS Files',
-        short_name: 'NAS',
-        description: 'Personal NAS file browser',
+        name: 'Vaulta',
+        short_name: 'Vaulta',
+        description: 'Private file storage for the home network',
         display: 'standalone',
         start_url: '/',
         scope: '/',
