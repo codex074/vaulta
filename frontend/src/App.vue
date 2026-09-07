@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { uploadFile } from './api/resources.js'
 import { onUnauthorized } from './api/http.js'
+import { showError } from './errorToast.js'
 import LoginView from './components/LoginView.vue'
 import Sidebar from './components/Sidebar.vue'
 import TopBar from './components/TopBar.vue'
@@ -11,6 +12,7 @@ import FileGrid from './components/FileGrid.vue'
 import FileListView from './components/FileListView.vue'
 import NewFolderDialog from './components/NewFolderDialog.vue'
 import UploadToast from './components/UploadToast.vue'
+import ErrorToast from './components/ErrorToast.vue'
 import ContextMenu from './components/ContextMenu.vue'
 import Lightbox from './components/Lightbox.vue'
 
@@ -83,6 +85,7 @@ async function onBulkDelete() {
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
     <UploadToast :uploads="uploads" />
+    <ErrorToast />
     <ContextMenu v-if="activeMenu" :entry="activeMenu.entry" :path="activeMenu.path" @close="activeMenu = null" />
     <Lightbox v-if="previewing" :entry="previewing" @close="previewing = null" />
   </div>
