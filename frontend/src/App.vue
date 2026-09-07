@@ -2,6 +2,8 @@
 import { onMounted, watch, ref, reactive, computed } from 'vue'
 import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
+import { useStarredStore } from './stores/starred.js'
+import { useTrashStore } from './stores/trash.js'
 import { uploadFile } from './api/resources.js'
 import { onUnauthorized } from './api/http.js'
 import { showError } from './errorToast.js'
@@ -18,16 +20,21 @@ import Lightbox from './components/Lightbox.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
+const starred = useStarredStore()
+const trash = useTrashStore()
 const showNewFolder = ref(false)
 const activeMenu = ref(null)
 const previewing = ref(null)
 const uploads = reactive([])
 const searchQuery = ref('')
-const filteredEntries = computed(() =>
-  !searchQuery.value
-    ? files.entries
-    : files.entries.filter((e) => e.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
-)
+const view = ref('browse')
+
+const activeEntries = computed(() => {
+  const source = view.value === 'starred' ? starred.entries : view.value === 'trash' ? trash.entries : files.entries
+  if (!searchQuery.value) return source
+  return source.filter((e) => e.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
+})
+
 let uploadId = 0
 const fileInputEl = ref(null)
 
@@ -48,6 +55,26 @@ watch(() => auth.user, (user) => {
 })
 
 onUnauthorized(() => { auth.user = null })
+
+async function onNavigate(nextView) {
+  view.value = nextView
+  searchQuery.value = ''
+  try {
+    if (nextView === 'starred') await starred.loadStarred()
+    else if (nextView === 'trash') await trash.loadTrash()
+  } catch (err) {
+    showError(err.message || 'Could not load.')
+  }
+}
+
+async function onEntryChanged() {
+  try {
+    if (view.value === 'browse') await files.loadDirectory(files.currentPath)
+    else if (view.value === 'starred') await starred.loadStarred()
+  } catch (err) {
+    showError(err.message || 'Could not refresh.')
+  }
+}
 
 async function handleFiles(fileList) {
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
@@ -74,9 +101,27 @@ const bulkError = ref('')
 async function onBulkDelete() {
   bulkError.value = ''
   try {
-    await files.deleteSelected()
+    if (view.value === 'trash') {
+      const items = trash.entries.filter((e) => files.selected.has(e.path))
+      for (const item of items) {
+        await trash.deleteForeverItem(item)
+      }
+      files.clearSelection()
+    } else {
+      await files.deleteSelected()
+      if (view.value === 'starred') await starred.loadStarred()
+      else await files.loadDirectory(files.currentPath)
+    }
   } catch (err) {
     bulkError.value = err.message || 'Some items could not be deleted.'
+  }
+}
+
+async function onEmptyTrash() {
+  try {
+    await trash.emptyAll()
+  } catch (err) {
+    showError(err.message || 'Could not empty trash.')
   }
 }
 </script>
@@ -85,24 +130,46 @@ async function onBulkDelete() {
   <LoginView v-if="auth.checked && !auth.user" />
   <div v-else-if="auth.checked" id="app-shell">
     <input ref="fileInputEl" type="file" multiple style="display: none" @change="onFileInputChange" />
-    <Sidebar @upload="triggerFilePicker" />
+    <Sidebar :view="view" @upload="triggerFilePicker" @navigate="onNavigate" />
     <div class="main">
       <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" @upload="triggerFilePicker" />
+      <div v-if="view === 'trash'" class="trash-bar">
+        <button @click="onEmptyTrash">Empty trash</button>
+      </div>
       <div v-if="files.selected.size" class="bulk-bar">
         <span>{{ files.selected.size }} selected</span>
-        <button @click="onBulkDelete">Delete</button>
+        <button @click="onBulkDelete">{{ view === 'trash' ? 'Delete forever' : 'Delete' }}</button>
         <button @click="files.clearSelection()">Clear</button>
         <span v-if="bulkError" class="bulk-error">{{ bulkError }}</span>
       </div>
       <div class="content" @dragover.prevent @drop="onDrop">
-        <FileGrid v-if="files.viewMode === 'grid'" :entries="filteredEntries" @menu="activeMenu = $event" @open="previewing = $event" />
-        <FileListView v-else :entries="filteredEntries" @menu="activeMenu = $event" @open="previewing = $event" />
+        <FileGrid
+          v-if="files.viewMode === 'grid'"
+          :entries="activeEntries"
+          :disable-open="view === 'trash'"
+          @menu="activeMenu = $event"
+          @open="previewing = $event"
+        />
+        <FileListView
+          v-else
+          :entries="activeEntries"
+          :disable-open="view === 'trash'"
+          @menu="activeMenu = $event"
+          @open="previewing = $event"
+        />
       </div>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
     <UploadToast :uploads="uploads" />
     <ErrorToast />
-    <ContextMenu v-if="activeMenu" :entry="activeMenu.entry" :path="activeMenu.path" @close="activeMenu = null" />
+    <ContextMenu
+      v-if="activeMenu"
+      :entry="activeMenu.entry"
+      :path="activeMenu.path"
+      :view="view"
+      @close="activeMenu = null"
+      @changed="onEntryChanged"
+    />
     <Lightbox v-if="previewing" :entry="previewing" @close="previewing = null" />
   </div>
 </template>
@@ -113,6 +180,8 @@ async function onBulkDelete() {
 .content { padding: 20px; flex: 1; }
 .bulk-bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: #eaf1ff; border-bottom: 1px solid var(--border); font-size: 13px; }
 .bulk-error { color: #d92d20; }
+.trash-bar { display: flex; justify-content: flex-end; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.trash-bar button { border: 1px solid var(--border); background: var(--bg-elevated); border-radius: 8px; padding: 6px 12px; }
 
 @media (max-width: 640px) {
   #app-shell { flex-direction: column; }
