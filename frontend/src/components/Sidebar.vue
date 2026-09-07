@@ -4,16 +4,23 @@ import { useAuthStore } from '../stores/auth.js'
 import { getStorageUsage } from '../api/storage.js'
 import { formatSize } from './fileFormat.js'
 import ChangePasswordDialog from './ChangePasswordDialog.vue'
+import ManageUsersDialog from './ManageUsersDialog.vue'
 
 defineProps({ view: { type: String, required: true } })
 const emit = defineEmits(['upload', 'navigate'])
 const auth = useAuthStore()
 const showAccountMenu = ref(false)
 const showChangePassword = ref(false)
+const showManageUsers = ref(false)
 
 function openChangePassword() {
   showAccountMenu.value = false
   showChangePassword.value = true
+}
+
+function openManageUsers() {
+  showAccountMenu.value = false
+  showManageUsers.value = true
 }
 
 const usedBytes = ref(0)
@@ -89,11 +96,13 @@ onUnmounted(() => {
           <span v-if="auth.user?.permissions?.admin" class="admin-badge">Admin</span>
         </div>
         <button @click="openChangePassword">Change password</button>
+        <button v-if="auth.user?.permissions?.admin" @click="openManageUsers">Manage users</button>
         <button class="danger" @click="auth.signOut()">Sign out</button>
       </div>
     </div>
   </nav>
   <ChangePasswordDialog v-if="showChangePassword" @close="showChangePassword = false" />
+  <ManageUsersDialog v-if="showManageUsers" @close="showManageUsers = false" />
 </template>
 
 <style scoped>
