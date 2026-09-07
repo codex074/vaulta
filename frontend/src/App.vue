@@ -182,7 +182,11 @@ async function onEmptyTrash() {
 </template>
 
 <style scoped>
-#app-shell { display: flex; min-height: 100vh; }
+#app-shell {
+  display: flex;
+  min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
 .main { flex: 1; display: flex; flex-direction: column; }
 .content { padding: 20px; flex: 1; }
 .bulk-bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; background: #eaf1ff; border-bottom: 1px solid var(--border); font-size: 13px; }

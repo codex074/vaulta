@@ -70,7 +70,8 @@ async function onSubmit() {
   align-items: center;
   justify-content: center;
   background: var(--ink);
-  padding: 24px;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
 }
 
 .login-panel {
