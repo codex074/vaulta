@@ -2,11 +2,13 @@
 import { useAuthStore } from '../stores/auth.js'
 
 const auth = useAuthStore()
+const emit = defineEmits(['upload'])
 </script>
 
 <template>
   <nav class="sidebar">
     <button class="sidebar-icon active" title="My Files">🗂️</button>
+    <button class="sidebar-icon" title="Upload" @click="emit('upload')">⬆️</button>
     <div class="sidebar-spacer"></div>
     <button class="sidebar-icon" title="Sign out" @click="auth.signOut()">👤</button>
   </nav>

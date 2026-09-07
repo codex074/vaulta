@@ -29,6 +29,16 @@ const filteredEntries = computed(() =>
     : files.entries.filter((e) => e.name.toLowerCase().includes(searchQuery.value.toLowerCase()))
 )
 let uploadId = 0
+const fileInputEl = ref(null)
+
+function triggerFilePicker() {
+  fileInputEl.value?.click()
+}
+
+function onFileInputChange(event) {
+  if (event.target.files.length) handleFiles(event.target.files)
+  event.target.value = ''
+}
 
 onMounted(() => auth.checkSession())
 watch(() => auth.user, (user) => {
@@ -74,9 +84,10 @@ async function onBulkDelete() {
 <template>
   <LoginView v-if="auth.checked && !auth.user" />
   <div v-else-if="auth.checked" id="app-shell">
-    <Sidebar />
+    <input ref="fileInputEl" type="file" multiple style="display: none" @change="onFileInputChange" />
+    <Sidebar @upload="triggerFilePicker" />
     <div class="main">
-      <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" />
+      <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" @upload="triggerFilePicker" />
       <div v-if="files.selected.size" class="bulk-bar">
         <span>{{ files.selected.size }} selected</span>
         <button @click="onBulkDelete">Delete</button>

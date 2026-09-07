@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
 
-const emit = defineEmits(['new-folder', 'search'])
+const emit = defineEmits(['new-folder', 'search', 'upload'])
 const files = useFilesStore()
 
 const crumbs = computed(() => {
@@ -36,6 +36,7 @@ async function goTo(path) {
     </nav>
     <input class="search" placeholder="Search" @input="emit('search', $event.target.value)" />
     <button @click="files.toggleViewMode()">{{ files.viewMode === 'grid' ? '☰ List' : '▦ Grid' }}</button>
+    <button @click="emit('upload')">⬆ Upload</button>
     <button @click="emit('new-folder')">+ New folder</button>
   </header>
 </template>
