@@ -4,9 +4,10 @@ import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { useStarredStore } from './stores/starred.js'
 import { useTrashStore } from './stores/trash.js'
-import { uploadFile } from './api/resources.js'
+import { uploadFile, makeDirectory } from './api/resources.js'
 import { onUnauthorized } from './api/http.js'
 import { showError } from './errorToast.js'
+import { collectFilesFromDataTransfer, directoriesFor } from './components/folderDrop.js'
 import LoginView from './components/LoginView.vue'
 import Sidebar from './components/Sidebar.vue'
 import TopBar from './components/TopBar.vue'
@@ -43,7 +44,8 @@ function triggerFilePicker() {
 }
 
 function onFileInputChange(event) {
-  if (event.target.files.length) handleFiles(event.target.files)
+  const items = Array.from(event.target.files).map((file) => ({ file, path: file.name }))
+  if (items.length) handleFiles(items)
   event.target.value = ''
 }
 
@@ -77,13 +79,21 @@ async function onEntryChanged() {
   }
 }
 
-async function handleFiles(fileList) {
+async function handleFiles(items) {
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
-  for (const file of Array.from(fileList)) {
-    const entry = reactive({ id: uploadId++, name: file.name, progress: 0, error: false, message: '' })
+  for (const dir of directoriesFor(items.map((item) => item.path))) {
+    try {
+      await makeDirectory(`${base}${dir}`)
+    } catch {
+      // Likely already exists (e.g. a sibling file created the same parent) — the
+      // upload below will surface a real problem with this directory on its own.
+    }
+  }
+  for (const { file, path } of items) {
+    const entry = reactive({ id: uploadId++, name: path, progress: 0, error: false, message: '' })
     uploads.push(entry)
     try {
-      await uploadFile(`${base}${file.name}`, file, (pct) => { entry.progress = pct })
+      await uploadFile(`${base}${path}`, file, (pct) => { entry.progress = pct })
     } catch (err) {
       entry.error = true
       entry.message = err.message || 'Failed'
@@ -93,9 +103,10 @@ async function handleFiles(fileList) {
   setTimeout(() => uploads.splice(0, uploads.length), 2000)
 }
 
-function onDrop(event) {
+async function onDrop(event) {
   event.preventDefault()
-  if (event.dataTransfer.files.length) handleFiles(event.dataTransfer.files)
+  const items = await collectFilesFromDataTransfer(event.dataTransfer)
+  if (items.length) handleFiles(items)
 }
 
 const bulkError = ref('')
@@ -133,7 +144,12 @@ async function onEmptyTrash() {
     <input ref="fileInputEl" type="file" multiple style="display: none" @change="onFileInputChange" />
     <Sidebar :view="view" @upload="triggerFilePicker" @navigate="onNavigate" />
     <div class="main">
-      <TopBar @new-folder="showNewFolder = true" @search="searchQuery = $event" @upload="triggerFilePicker" />
+      <TopBar
+        :entries="activeEntries"
+        @new-folder="showNewFolder = true"
+        @search="searchQuery = $event"
+        @upload="triggerFilePicker"
+      />
       <div v-if="view === 'trash'" class="trash-bar">
         <button @click="onEmptyTrash">Empty trash</button>
       </div>

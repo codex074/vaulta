@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { showError } from '../errorToast.js'
@@ -16,6 +16,13 @@ const dropTargetPath = ref(null)
 
 function fullPath(entry) {
   return entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${entry.name}`
+}
+const allSelected = computed(() =>
+  props.entries.length > 0 && props.entries.every((entry) => files.selected.has(fullPath(entry)))
+)
+function onToggleSelectAll() {
+  if (allSelected.value) files.clearSelection()
+  else files.selectAllPaths(props.entries.map(fullPath))
 }
 async function onClick(entry) {
   if (props.disableOpen) return
@@ -73,7 +80,18 @@ async function onDrop(event, entry) {
 
 <template>
   <table class="list">
-    <thead><tr><th></th><th></th><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th class="select-col">
+          <input type="checkbox" :checked="allSelected" @click="onToggleSelectAll" />
+        </th>
+        <th></th>
+        <th>Name</th>
+        <th>Size</th>
+        <th>Modified</th>
+        <th></th>
+      </tr>
+    </thead>
     <tbody>
       <tr
         v-for="entry in entries"

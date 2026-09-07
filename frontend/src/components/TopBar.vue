@@ -3,10 +3,23 @@ import { computed, ref } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
 import { dragPaths, isValidDropTarget, hasDragPayload, isWithin, moveInto } from './dragMove.js'
+import { entryPath } from './pathHelpers.js'
 
+const props = defineProps({
+  entries: { type: Array, default: () => [] },
+})
 const emit = defineEmits(['new-folder', 'search', 'upload'])
 const files = useFilesStore()
 const dropTargetPath = ref(null)
+
+const allSelected = computed(() =>
+  props.entries.length > 0 &&
+  props.entries.every((entry) => files.selected.has(entryPath(entry, files.currentPath)))
+)
+function onToggleSelectAll() {
+  if (allSelected.value) files.clearSelection()
+  else files.selectAllPaths(props.entries.map((entry) => entryPath(entry, files.currentPath)))
+}
 
 const crumbs = computed(() => {
   const parts = files.currentPath.split('/').filter(Boolean)
@@ -55,6 +68,10 @@ async function onDrop(event, path) {
 
 <template>
   <header class="topbar">
+    <label class="select-all">
+      <input type="checkbox" :checked="allSelected" @change="onToggleSelectAll" />
+      Select all
+    </label>
     <nav class="breadcrumb">
       <span v-for="(crumb, i) in crumbs" :key="crumb.path">
         <button
@@ -77,6 +94,7 @@ async function onDrop(event, path) {
 
 <style scoped>
 .topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-elevated); }
+.select-all { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); white-space: nowrap; cursor: pointer; }
 .breadcrumb { flex: 1; }
 .crumb { border: none; background: none; color: var(--text); font-weight: 600; padding: 4px; }
 .crumb:hover { color: var(--accent); }

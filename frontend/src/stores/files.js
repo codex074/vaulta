@@ -53,6 +53,9 @@ export const useFilesStore = defineStore('files', {
     clearSelection() {
       this.selected = new Set()
     },
+    selectAllPaths(paths) {
+      this.selected = new Set(paths)
+    },
     async toggleStar(entry) {
       const parentPath = entry.path ? parentOf(entry.path) : this.currentPath
       const isPinned = entry.pinned ?? this.pinnedNames.has(entry.name)

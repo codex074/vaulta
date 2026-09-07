@@ -57,6 +57,13 @@ describe('files store', () => {
     expect(store.selected.has('/a.jpg')).toBe(false)
   })
 
+  it('selectAllPaths replaces the selection with the given paths', () => {
+    const store = useFilesStore()
+    store.toggleSelect('/stale.jpg')
+    store.selectAllPaths(['/a.jpg', '/b.jpg'])
+    expect(store.selected).toEqual(new Set(['/a.jpg', '/b.jpg']))
+  })
+
   it('deleteSelected calls softDelete for each selected path and clears selection', async () => {
     trash.softDelete.mockResolvedValue(undefined)
     const store = useFilesStore()
