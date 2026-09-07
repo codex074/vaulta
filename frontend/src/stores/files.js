@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { listDirectory, bulkDelete } from '../api/resources.js'
+import { togglePinned } from '../api/pinned.js'
 
 const VIEW_MODE_KEY = 'nas-view-mode'
 
@@ -7,6 +8,7 @@ export const useFilesStore = defineStore('files', {
   state: () => ({
     currentPath: '/',
     entries: [],
+    pinnedNames: new Set(),
     viewMode: localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'grid',
     selected: new Set(),
     loading: false,
@@ -23,6 +25,7 @@ export const useFilesStore = defineStore('files', {
         this.entries = [...folders, ...files]
         this.currentPath = path
         this.selected = new Set()
+        this.pinnedNames = new Set(result.pinnedItems || [])
       } catch (err) {
         this.error = err
         throw err
@@ -42,6 +45,14 @@ export const useFilesStore = defineStore('files', {
     },
     clearSelection() {
       this.selected = new Set()
+    },
+    async toggleStar(entry) {
+      const isPinned = this.pinnedNames.has(entry.name)
+      await togglePinned({ name: entry.name, path: this.currentPath, source: 'share' }, isPinned ? 'remove' : 'add')
+      const next = new Set(this.pinnedNames)
+      if (isPinned) next.delete(entry.name)
+      else next.add(entry.name)
+      this.pinnedNames = next
     },
     async deleteSelected() {
       const paths = Array.from(this.selected)

@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useFilesStore } from '../../src/stores/files.js'
 import * as resources from '../../src/api/resources.js'
+import * as pinned from '../../src/api/pinned.js'
 
 vi.mock('../../src/api/resources.js', () => ({
   listDirectory: vi.fn(),
   bulkDelete: vi.fn(),
+}))
+vi.mock('../../src/api/pinned.js', () => ({
+  togglePinned: vi.fn(),
 }))
 
 describe('files store', () => {
@@ -66,5 +70,41 @@ describe('files store', () => {
     const store = useFilesStore()
     store.selected = new Set(['/a.txt'])
     await expect(store.deleteSelected()).rejects.toThrow('/a.txt')
+  })
+
+  it('loadDirectory captures pinnedItems from the response into pinnedNames', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/', source: 'share', folders: [], files: [{ name: 'a.txt', type: 'text/plain' }],
+      pinnedItems: ['a.txt'],
+    })
+    const store = useFilesStore()
+    await store.loadDirectory('/')
+    expect(store.pinnedNames).toEqual(new Set(['a.txt']))
+  })
+
+  it('loadDirectory defaults pinnedNames to empty when the response omits pinnedItems', async () => {
+    resources.listDirectory.mockResolvedValue({ path: '/', source: 'share', folders: [], files: [] })
+    const store = useFilesStore()
+    await store.loadDirectory('/')
+    expect(store.pinnedNames).toEqual(new Set())
+  })
+
+  it('toggleStar pins an unpinned item and updates pinnedNames', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    store.currentPath = '/'
+    await store.toggleStar({ name: 'a.txt' })
+    expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'a.txt', path: '/', source: 'share' }, 'add')
+    expect(store.pinnedNames.has('a.txt')).toBe(true)
+  })
+
+  it('toggleStar unpins an already-pinned item', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    store.currentPath = '/'
+    store.pinnedNames = new Set(['a.txt'])
+    await store.toggleStar({ name: 'a.txt' })
+    expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'a.txt', path: '/', source: 'share' }, 'remove')
+    expect(store.pinnedNames.has('a.txt')).toBe(false)
   })
 })
