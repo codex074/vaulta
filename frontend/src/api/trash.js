@@ -1,4 +1,4 @@
-import { moveItem, uploadFile, getFileText, deleteItem, listDirectory } from './resources.js'
+import { moveItem, uploadFile, getFileText, deleteItem, listDirectory, makeDirectory } from './resources.js'
 
 function basename(path) {
   const idx = path.lastIndexOf('/')
@@ -16,6 +16,11 @@ export function metaPathFor(trashPath) {
 export async function softDelete(originalPath) {
   const ts = Date.now()
   const trashPath = trashPathFor(originalPath, ts)
+  try {
+    await makeDirectory('/.trash')
+  } catch (err) {
+    if (err.status !== 409) throw err
+  }
   await moveItem(originalPath, trashPath)
   try {
     const meta = { originalPath, deletedAt: ts }

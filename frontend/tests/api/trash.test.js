@@ -10,6 +10,7 @@ vi.mock('../../src/api/resources.js', () => ({
   getFileText: vi.fn(),
   deleteItem: vi.fn(),
   listDirectory: vi.fn(),
+  makeDirectory: vi.fn(),
 }))
 
 describe('trash API', () => {
@@ -27,6 +28,7 @@ describe('trash API', () => {
   })
 
   it('softDelete moves the item into /.trash and uploads a sidecar', async () => {
+    resources.makeDirectory.mockResolvedValue(undefined)
     resources.moveItem.mockResolvedValue(undefined)
     resources.uploadFile.mockResolvedValue(undefined)
     await softDelete('/Photos/a.jpg')
@@ -44,9 +46,36 @@ describe('trash API', () => {
   })
 
   it('softDelete surfaces a clear error when the sidecar upload fails after a successful move', async () => {
+    resources.makeDirectory.mockResolvedValue(undefined)
     resources.moveItem.mockResolvedValue(undefined)
     resources.uploadFile.mockRejectedValue(new Error('disk full'))
     await expect(softDelete('/a.jpg')).rejects.toThrow("Moved to trash, but couldn't save its restore info: disk full")
+  })
+
+  it('softDelete creates /.trash first, then moves the item', async () => {
+    resources.makeDirectory.mockResolvedValue(undefined)
+    resources.moveItem.mockResolvedValue(undefined)
+    resources.uploadFile.mockResolvedValue(undefined)
+    await softDelete('/a.jpg')
+    expect(resources.makeDirectory).toHaveBeenCalledWith('/.trash')
+    expect(resources.makeDirectory).toHaveBeenCalledTimes(1)
+    expect(resources.moveItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('softDelete treats a 409 from makeDirectory (already exists) as success', async () => {
+    const conflict = Object.assign(new Error('already exists'), { status: 409 })
+    resources.makeDirectory.mockRejectedValue(conflict)
+    resources.moveItem.mockResolvedValue(undefined)
+    resources.uploadFile.mockResolvedValue(undefined)
+    await expect(softDelete('/a.jpg')).resolves.toBeUndefined()
+    expect(resources.moveItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('softDelete propagates a non-409 makeDirectory failure without attempting the move', async () => {
+    const permissionError = Object.assign(new Error('permission denied'), { status: 403 })
+    resources.makeDirectory.mockRejectedValue(permissionError)
+    await expect(softDelete('/a.jpg')).rejects.toThrow('permission denied')
+    expect(resources.moveItem).not.toHaveBeenCalled()
   })
 
   it('listTrash pairs each item with its parsed sidecar and skips .trashmeta files themselves', async () => {
