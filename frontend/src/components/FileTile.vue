@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
+import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 
 const props = defineProps({
@@ -16,6 +17,10 @@ const fullPath = computed(() =>
 )
 const isSelected = computed(() => files.selected.has(fullPath.value))
 const isStarred = computed(() => props.entry.pinned ?? files.pinnedNames.has(props.entry.name))
+const thumbFailed = ref(false)
+watch(fullPath, () => { thumbFailed.value = false })
+const showThumb = computed(() => props.entry.hasPreview && !thumbFailed.value)
+const thumbSrc = computed(() => previewUrl(fullPath.value, 'small'))
 
 async function onClick() {
   if (props.disableOpen) return
@@ -51,7 +56,10 @@ async function onStarClick() {
     <button v-if="!disableOpen" class="star" :class="{ starred: isStarred }" @click.stop="onStarClick">
       {{ isStarred ? '⭐' : '☆' }}
     </button>
-    <div class="thumb" @click="onClick">{{ iconFor(entry) }}</div>
+    <div class="thumb" @click="onClick">
+      <img v-if="showThumb" :src="thumbSrc" :alt="entry.name" loading="lazy" @error="thumbFailed = true" />
+      <template v-else>{{ iconFor(entry) }}</template>
+    </div>
     <div class="name" :title="entry.name">{{ entry.displayName ?? entry.name }}</div>
     <div class="meta">
       <span>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</span>
@@ -72,7 +80,8 @@ async function onStarClick() {
   gap: 6px;
 }
 .tile.selected { border-color: var(--accent); background: #eaf1ff; }
-.thumb { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; }
+.thumb { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; overflow: hidden; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
 .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); }
 .dots { position: absolute; top: 6px; right: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 14px; }

@@ -1,7 +1,11 @@
 <script setup>
+import { reactive } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
+import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
+
+const failedThumbs = reactive(new Set())
 
 const props = defineProps({
   entries: { type: Array, required: true },
@@ -51,7 +55,18 @@ async function onStarClick(entry) {
             {{ entry.pinned ?? files.pinnedNames.has(entry.name) ? '⭐' : '☆' }}
           </button>
         </td>
-        <td @click="onClick(entry)">{{ iconFor(entry) }} {{ entry.displayName ?? entry.name }}</td>
+        <td class="name-col" @click="onClick(entry)">
+          <img
+            v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))"
+            class="row-thumb"
+            :src="previewUrl(fullPath(entry), 'small')"
+            :alt="entry.name"
+            loading="lazy"
+            @error="failedThumbs.add(fullPath(entry))"
+          />
+          <span v-else class="row-icon">{{ iconFor(entry) }}</span>
+          {{ entry.displayName ?? entry.name }}
+        </td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
         <td>{{ formatRelativeTime(entry.deletedAt ?? entry.modified) }}</td>
         <td><button @click.stop="emit('menu', { entry, path: fullPath(entry) })">⋮</button></td>
@@ -65,6 +80,8 @@ async function onStarClick(entry) {
 .list th { text-align: left; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 8px 16px; }
 .list td { padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .list td:nth-child(3) { cursor: pointer; }
+.row-thumb { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
+.row-icon { display: inline-block; width: 20px; text-align: center; margin-right: 4px; }
 .list button { border: none; background: none; color: var(--text-muted); }
 .select-col, .star-col { width: 32px; }
 .star { font-size: 13px; }

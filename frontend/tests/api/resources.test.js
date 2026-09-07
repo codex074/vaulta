@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   listDirectory, makeDirectory, deleteItem,
-  moveItem, renameItem, downloadUrl, uploadFile, getFileText,
+  moveItem, renameItem, downloadUrl, previewUrl, uploadFile, getFileText,
 } from '../../src/api/resources.js'
 
 describe('resources API', () => {
@@ -64,6 +64,14 @@ describe('resources API', () => {
 
   it('downloadUrl builds a plain GET link', () => {
     expect(downloadUrl('/Photos/a.jpg')).toBe('/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share')
+  })
+
+  it('previewUrl defaults to small size', () => {
+    expect(previewUrl('/Photos/a.jpg')).toBe('/api/resources/preview?path=%2FPhotos%2Fa.jpg&source=share&size=small')
+  })
+
+  it('previewUrl accepts an explicit size', () => {
+    expect(previewUrl('/Photos/a.jpg', 'large')).toBe('/api/resources/preview?path=%2FPhotos%2Fa.jpg&source=share&size=large')
   })
 
   it('getFileText requests content=true and returns the content field', async () => {

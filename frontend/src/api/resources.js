@@ -86,6 +86,11 @@ export function downloadUrl(path) {
   return `/api/resources/download?${params.toString()}`
 }
 
+export function previewUrl(path, size = 'small') {
+  const params = new URLSearchParams({ path, source: SOURCE, size })
+  return `/api/resources/preview?${params.toString()}`
+}
+
 export async function getFileText(path) {
   const response = await authorizedFetch(resourcesUrl(path, { content: 'true' }))
   if (!response.ok) throw await apiError(response)
