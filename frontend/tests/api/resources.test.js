@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   listDirectory, makeDirectory, deleteItem, bulkDelete,
-  moveItem, renameItem, downloadUrl, uploadFile,
+  moveItem, renameItem, downloadUrl, uploadFile, getFileText,
 } from '../../src/api/resources.js'
 
 describe('resources API', () => {
@@ -77,6 +77,18 @@ describe('resources API', () => {
 
   it('downloadUrl builds a plain GET link', () => {
     expect(downloadUrl('/Photos/a.jpg')).toBe('/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share')
+  })
+
+  it('getFileText requests content=true and returns the content field', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ name: 'x.trashmeta', content: '{"originalPath":"/a.txt"}' }),
+    })
+    const text = await getFileText('/.trash/x.trashmeta')
+    expect(global.fetch.mock.calls[0][0]).toContain('path=%2F.trash%2Fx.trashmeta')
+    expect(global.fetch.mock.calls[0][0]).toContain('content=true')
+    expect(text).toBe('{"originalPath":"/a.txt"}')
   })
 
   it('listDirectory throws the message from the JSON error body', async () => {
