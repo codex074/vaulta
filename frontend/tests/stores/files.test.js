@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useFilesStore } from '../../src/stores/files.js'
+import { useStarredStore } from '../../src/stores/starred.js'
 import * as resources from '../../src/api/resources.js'
 import * as pinned from '../../src/api/pinned.js'
 import * as trash from '../../src/api/trash.js'
@@ -130,5 +131,27 @@ describe('files store', () => {
     await store.toggleStar({ name: 'c.jpg', path: '/c.jpg', pinned: true })
     expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'c.jpg', path: '/', source: 'share' }, 'remove')
     expect(store.pinnedNames).toEqual(new Set())
+  })
+
+  it('toggleStar removes an unstarred foreign entry from the starred store\'s list', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    const starred = useStarredStore()
+    starred.entries = [
+      { name: 'c.jpg', path: '/Photos/c.jpg', pinned: true },
+      { name: 'd.jpg', path: '/Photos/d.jpg', pinned: true },
+    ]
+    await store.toggleStar({ name: 'c.jpg', path: '/Photos/c.jpg', pinned: true })
+    expect(starred.entries).toEqual([{ name: 'd.jpg', path: '/Photos/d.jpg', pinned: true }])
+  })
+
+  it('toggleStar does not touch the starred store\'s list when pinning a browse-view entry', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    store.currentPath = '/'
+    const starred = useStarredStore()
+    starred.entries = [{ name: 'd.jpg', path: '/Photos/d.jpg', pinned: true }]
+    await store.toggleStar({ name: 'a.txt' })
+    expect(starred.entries).toEqual([{ name: 'd.jpg', path: '/Photos/d.jpg', pinned: true }])
   })
 })

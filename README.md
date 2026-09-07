@@ -2,8 +2,9 @@
 
 A custom Google-Drive-style file browser frontend for a personal NAS, backed by
 FileBrowser Quantum's REST API. Built with Vue 3 (Composition API), Vite, and
-Pinia; packaged as a two-stage Docker build (Vite build → nginx serving the
-static SPA and reverse-proxying `/api/*` to FileBrowser Quantum).
+Pinia; packaged as a multi-stage Docker build (Vite build + a small Go
+disk-usage sidecar build → nginx serving the static SPA, reverse-proxying
+`/api/*` to FileBrowser Quantum and `/nasapi/*` to the sidecar).
 
 ## Local development
 
@@ -63,9 +64,12 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 
 ## Architecture
 
-- `frontend/src/api/` — thin REST client for FileBrowser Quantum
-  (`auth.js`, `resources.js`, `http.js`)
-- `frontend/src/stores/` — Pinia stores (`auth.js`, `files.js`)
+- `frontend/src/api/` — thin REST client for FileBrowser Quantum and the
+  `nasapi` sidecar (`auth.js`, `resources.js`, `http.js`, `pinned.js`
+  for starring, `trash.js` for the move-to-`.trash` soft-delete convention,
+  `storage.js` for the disk-usage endpoint)
+- `frontend/src/stores/` — Pinia stores (`auth.js`, `files.js`, `starred.js`,
+  `trash.js`)
 - `frontend/src/components/` — UI components
 - `docker/Dockerfile`, `docker/nginx.conf` — production container build and
   nginx reverse-proxy config

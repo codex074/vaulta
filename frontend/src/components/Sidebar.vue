@@ -39,16 +39,31 @@ onUnmounted(() => {
 
 <template>
   <nav class="sidebar">
-    <button class="sidebar-icon" :class="{ active: view === 'browse' }" title="หน้าแรก" @click="emit('navigate', 'browse')">🏠</button>
-    <button class="sidebar-icon" :class="{ active: view === 'starred' }" title="ที่ติดดาว" @click="emit('navigate', 'starred')">⭐</button>
-    <button class="sidebar-icon" :class="{ active: view === 'trash' }" title="ถังขยะ" @click="emit('navigate', 'trash')">🗑️</button>
-    <button class="sidebar-icon" title="Upload" @click="emit('upload')">⬆️</button>
+    <button class="sidebar-item" :class="{ active: view === 'browse' }" @click="emit('navigate', 'browse')">
+      <span class="sidebar-icon">🏠</span>
+      <span class="sidebar-label">หน้าแรก</span>
+    </button>
+    <button class="sidebar-item" :class="{ active: view === 'starred' }" @click="emit('navigate', 'starred')">
+      <span class="sidebar-icon">⭐</span>
+      <span class="sidebar-label">ที่ติดดาว</span>
+    </button>
+    <button class="sidebar-item" :class="{ active: view === 'trash' }" @click="emit('navigate', 'trash')">
+      <span class="sidebar-icon">🗑️</span>
+      <span class="sidebar-label">ถังขยะ</span>
+    </button>
+    <button class="sidebar-item" @click="emit('upload')">
+      <span class="sidebar-icon">⬆️</span>
+      <span class="sidebar-label">Upload</span>
+    </button>
     <div class="sidebar-spacer"></div>
-    <div v-if="!storageError" class="storage" title="พื้นที่เก็บข้อมูล">
+    <div v-if="!storageError" class="storage">
       <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%' }"></div></div>
       <div class="storage-label">{{ formatSize(usedBytes) }} / {{ formatSize(totalBytes) }}</div>
     </div>
-    <button class="sidebar-icon" title="Sign out" @click="auth.signOut()">👤</button>
+    <button class="sidebar-item" @click="auth.signOut()">
+      <span class="sidebar-icon">👤</span>
+      <span class="sidebar-label">Sign out</span>
+    </button>
   </nav>
 </template>
 
@@ -59,27 +74,43 @@ onUnmounted(() => {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 12px 0;
-  gap: 8px;
+  padding: 12px 8px;
+  gap: 2px;
 }
 .sidebar-spacer { flex: 1; }
-.sidebar-icon {
-  width: 40px; height: 40px;
-  border: none; background: transparent; border-radius: 8px; font-size: 18px;
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
 }
-.sidebar-icon.active { background: var(--border); }
-.storage { width: 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 4px; }
+.sidebar-item:hover { background: var(--bg); }
+.sidebar-item.active { background: var(--border); font-weight: 600; }
+.sidebar-item.active:hover { background: var(--border); }
+.sidebar-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+.sidebar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.storage { padding: 8px 12px 4px; display: flex; flex-direction: column; gap: 4px; }
 .storage-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
 .storage-fill { height: 100%; background: var(--accent); }
-.storage-label { font-size: 8px; color: var(--text-muted); text-align: center; line-height: 1.2; }
+.storage-label { font-size: 11px; color: var(--text-muted); }
 
 @media (max-width: 640px) {
   .sidebar {
-    width: 100%; height: 56px; flex-direction: row;
+    width: 100%; height: 56px; flex-direction: row; align-items: center;
     border-right: none; border-top: 1px solid var(--border);
-    order: 2;
+    order: 2; padding: 6px 8px; gap: 4px; overflow-x: auto;
   }
+  .sidebar-label { display: none; }
+  .sidebar-item { width: auto; padding: 8px; }
   .storage { display: none; }
 }
 </style>

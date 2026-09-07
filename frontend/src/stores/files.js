@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { listDirectory } from '../api/resources.js'
 import { togglePinned } from '../api/pinned.js'
 import { softDelete } from '../api/trash.js'
+import { useStarredStore } from './starred.js'
 
 const VIEW_MODE_KEY = 'nas-view-mode'
 
@@ -61,6 +62,9 @@ export const useFilesStore = defineStore('files', {
         if (isPinned) next.delete(entry.name)
         else next.add(entry.name)
         this.pinnedNames = next
+      } else if (isPinned) {
+        const starred = useStarredStore()
+        starred.entries = starred.entries.filter((e) => e.path !== entry.path)
       }
     },
     async deleteSelected() {

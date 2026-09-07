@@ -55,7 +55,7 @@ async function onStarClick() {
     <div class="name" :title="entry.name">{{ entry.displayName ?? entry.name }}</div>
     <div class="meta">
       <span>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</span>
-      <span>{{ formatRelativeTime(entry.deletedAt ?? entry.modified) }}</span>
+      <span>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</span>
     </div>
   </div>
 </template>

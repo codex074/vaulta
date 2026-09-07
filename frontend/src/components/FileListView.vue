@@ -53,7 +53,7 @@ async function onStarClick(entry) {
         </td>
         <td @click="onClick(entry)">{{ iconFor(entry) }} {{ entry.displayName ?? entry.name }}</td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
-        <td>{{ formatRelativeTime(entry.deletedAt ?? entry.modified) }}</td>
+        <td>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</td>
         <td><button @click.stop="emit('menu', { entry, path: fullPath(entry) })">⋮</button></td>
       </tr>
     </tbody>
