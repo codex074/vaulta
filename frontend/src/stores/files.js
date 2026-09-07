@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { listDirectory, bulkDelete } from '../api/resources.js'
+import { listDirectory } from '../api/resources.js'
 import { togglePinned } from '../api/pinned.js'
+import { softDelete } from '../api/trash.js'
 
 const VIEW_MODE_KEY = 'nas-view-mode'
 
@@ -56,11 +57,17 @@ export const useFilesStore = defineStore('files', {
     },
     async deleteSelected() {
       const paths = Array.from(this.selected)
-      const result = await bulkDelete(paths)
-      await this.loadDirectory(this.currentPath)
-      const failed = result && Array.isArray(result.failed) ? result.failed : []
+      const failed = []
+      for (const path of paths) {
+        try {
+          await softDelete(path)
+        } catch (err) {
+          failed.push({ path, message: err.message })
+        }
+      }
+      this.selected = new Set()
       if (failed.length) {
-        const names = failed.map((f) => (typeof f === 'string' ? f : f.path || JSON.stringify(f))).join(', ')
+        const names = failed.map((f) => f.path).join(', ')
         throw new Error(`Could not delete: ${names}`)
       }
     },

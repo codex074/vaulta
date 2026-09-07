@@ -56,16 +56,6 @@ export async function deleteItem(path) {
   if (!response.ok) throw await apiError(response)
 }
 
-export async function bulkDelete(paths) {
-  const response = await authorizedFetch('/api/resources/bulk', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(paths.map((path) => ({ source: SOURCE, path }))),
-  })
-  if (!response.ok) throw await apiError(response)
-  return response.json()
-}
-
 export async function moveItem(fromPath, toPath, action = 'move') {
   const response = await authorizedFetch('/api/resources', {
     method: 'PATCH',

@@ -3,13 +3,16 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useFilesStore } from '../../src/stores/files.js'
 import * as resources from '../../src/api/resources.js'
 import * as pinned from '../../src/api/pinned.js'
+import * as trash from '../../src/api/trash.js'
 
 vi.mock('../../src/api/resources.js', () => ({
   listDirectory: vi.fn(),
-  bulkDelete: vi.fn(),
 }))
 vi.mock('../../src/api/pinned.js', () => ({
   togglePinned: vi.fn(),
+}))
+vi.mock('../../src/api/trash.js', () => ({
+  softDelete: vi.fn(),
 }))
 
 describe('files store', () => {
@@ -53,23 +56,25 @@ describe('files store', () => {
     expect(store.selected.has('/a.jpg')).toBe(false)
   })
 
-  it('deleteSelected calls bulkDelete with selected paths and clears selection on success', async () => {
-    resources.bulkDelete.mockResolvedValue({ succeeded: ['/a.jpg'], failed: [] })
-    resources.listDirectory.mockResolvedValue({ path: '/', source: 'share', folders: [], files: [] })
+  it('deleteSelected calls softDelete for each selected path and clears selection', async () => {
+    trash.softDelete.mockResolvedValue(undefined)
     const store = useFilesStore()
-    store.currentPath = '/'
     store.toggleSelect('/a.jpg')
+    store.toggleSelect('/b.jpg')
     await store.deleteSelected()
-    expect(resources.bulkDelete).toHaveBeenCalledWith(['/a.jpg'])
+    expect(trash.softDelete).toHaveBeenCalledWith('/a.jpg')
+    expect(trash.softDelete).toHaveBeenCalledWith('/b.jpg')
     expect(store.selected.size).toBe(0)
   })
 
-  it('deleteSelected throws when some deletes fail', async () => {
-    resources.bulkDelete.mockResolvedValue({ succeeded: [], failed: [{ path: '/a.txt' }] })
-    resources.listDirectory.mockResolvedValue({ folders: [], files: [] })
+  it('deleteSelected throws listing the paths that failed, but still clears selection', async () => {
+    trash.softDelete.mockImplementation((path) =>
+      path === '/bad.jpg' ? Promise.reject(new Error('boom')) : Promise.resolve()
+    )
     const store = useFilesStore()
-    store.selected = new Set(['/a.txt'])
-    await expect(store.deleteSelected()).rejects.toThrow('/a.txt')
+    store.toggleSelect('/bad.jpg')
+    await expect(store.deleteSelected()).rejects.toThrow('/bad.jpg')
+    expect(store.selected.size).toBe(0)
   })
 
   it('loadDirectory captures pinnedItems from the response into pinnedNames', async () => {

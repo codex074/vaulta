@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  listDirectory, makeDirectory, deleteItem, bulkDelete,
+  listDirectory, makeDirectory, deleteItem,
   moveItem, renameItem, downloadUrl, uploadFile, getFileText,
 } from '../../src/api/resources.js'
 
@@ -33,19 +33,6 @@ describe('resources API', () => {
     const [url, opts] = global.fetch.mock.calls[0]
     expect(url).toContain('path=%2FPhotos%2Fa.jpg')
     expect(opts.method).toBe('DELETE')
-  })
-
-  it('bulkDelete posts an array of {source,path} to /api/resources/bulk', async () => {
-    global.fetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ succeeded: [], failed: [] }) })
-    await bulkDelete(['/a.jpg', '/b.jpg'])
-    const [url, opts] = global.fetch.mock.calls[0]
-    expect(url).toContain('/api/resources/bulk')
-    expect(opts.method).toBe('DELETE')
-    const body = JSON.parse(opts.body)
-    expect(body).toEqual([
-      { source: 'share', path: '/a.jpg' },
-      { source: 'share', path: '/b.jpg' },
-    ])
   })
 
   it('moveItem PATCHes with a move action', async () => {
