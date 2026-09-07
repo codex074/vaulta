@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { login, logout, getCurrentUser } from '../api/auth.js'
+import { login, logout, getCurrentUser, changePassword as changePasswordApi } from '../api/auth.js'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({ user: null, checked: false }),
@@ -20,6 +20,9 @@ export const useAuthStore = defineStore('auth', {
     async signOut() {
       await logout()
       this.user = null
+    },
+    async changePassword(currentPassword, newPassword) {
+      await changePasswordApi(currentPassword, newPassword)
     },
   },
 })

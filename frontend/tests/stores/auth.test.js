@@ -8,6 +8,7 @@ vi.mock('../../src/api/auth.js', () => ({
   login: vi.fn(),
   logout: vi.fn(),
   getCurrentUser: vi.fn(),
+  changePassword: vi.fn(),
 }))
 
 describe('auth store', () => {
@@ -47,5 +48,12 @@ describe('auth store', () => {
     store.user = { username: 'codex' }
     await store.signOut()
     expect(store.user).toBeNull()
+  })
+
+  it('changePassword delegates to the API with the given credentials', async () => {
+    authApi.changePassword.mockResolvedValue()
+    const store = useAuthStore()
+    await store.changePassword('oldpass', 'newpass')
+    expect(authApi.changePassword).toHaveBeenCalledWith('oldpass', 'newpass')
   })
 })

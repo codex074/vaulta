@@ -3,10 +3,18 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import { getStorageUsage } from '../api/storage.js'
 import { formatSize } from './fileFormat.js'
+import ChangePasswordDialog from './ChangePasswordDialog.vue'
 
 defineProps({ view: { type: String, required: true } })
 const emit = defineEmits(['upload', 'navigate'])
 const auth = useAuthStore()
+const showAccountMenu = ref(false)
+const showChangePassword = ref(false)
+
+function openChangePassword() {
+  showAccountMenu.value = false
+  showChangePassword.value = true
+}
 
 const usedBytes = ref(0)
 const totalBytes = ref(0)
@@ -69,11 +77,23 @@ onUnmounted(() => {
       <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%', background: fillColor }"></div></div>
       <div class="storage-label">{{ formatSize(usedBytes) }} of {{ formatSize(totalBytes) }} used</div>
     </div>
-    <button class="sidebar-item" @click="auth.signOut()">
-      <span class="sidebar-icon">👤</span>
-      <span class="sidebar-label">Sign out</span>
-    </button>
+    <div class="account-wrapper">
+      <button class="sidebar-item" :class="{ active: showAccountMenu }" @click="showAccountMenu = !showAccountMenu">
+        <span class="sidebar-icon">👤</span>
+        <span class="sidebar-label">{{ auth.user?.username || 'Account' }}</span>
+      </button>
+      <div v-if="showAccountMenu" class="account-backdrop" @click="showAccountMenu = false"></div>
+      <div v-if="showAccountMenu" class="account-menu">
+        <div class="account-menu-header">
+          {{ auth.user?.username }}
+          <span v-if="auth.user?.permissions?.admin" class="admin-badge">Admin</span>
+        </div>
+        <button @click="openChangePassword">Change password</button>
+        <button class="danger" @click="auth.signOut()">Sign out</button>
+      </div>
+    </div>
   </nav>
+  <ChangePasswordDialog v-if="showChangePassword" @close="showChangePassword = false" />
 </template>
 
 <style scoped>
@@ -129,6 +149,54 @@ onUnmounted(() => {
 .storage-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .storage-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease, background 0.3s ease; }
 .storage-label { font-size: 11px; color: var(--text-muted); }
+
+.account-wrapper { position: relative; }
+.account-backdrop { position: fixed; inset: 0; z-index: 15; }
+.account-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 16;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  min-width: 180px;
+}
+.account-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.admin-badge {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.account-menu button {
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.account-menu button:hover { background: var(--bg); }
+.account-menu .danger { color: #d92d20; }
 
 @media (max-width: 640px) {
   .sidebar {
