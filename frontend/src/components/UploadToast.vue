@@ -7,7 +7,7 @@ defineProps({ uploads: { type: Array, required: true } })
     <div v-for="u in uploads" :key="u.id" class="row">
       <span class="name">{{ u.name }}</span>
       <div class="bar"><div class="fill" :style="{ width: u.progress + '%' }"></div></div>
-      <span class="pct">{{ u.error ? 'Failed' : u.progress + '%' }}</span>
+      <span class="pct">{{ u.error ? u.message : u.progress + '%' }}</span>
     </div>
   </div>
 </template>

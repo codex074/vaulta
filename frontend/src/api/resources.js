@@ -1,4 +1,4 @@
-import { authorizedFetch, apiError } from './http.js'
+import { authorizedFetch, apiError, notifyUnauthorized } from './http.js'
 
 const SOURCE = 'share'
 
@@ -32,8 +32,19 @@ export function uploadFile(path, file, onProgress) {
       }
     }
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(Object.assign(new Error('Upload failed'), { status: xhr.status }))
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        if (xhr.status === 401) notifyUnauthorized()
+        let message = 'Upload failed'
+        try {
+          const body = JSON.parse(xhr.responseText)
+          if (body && body.message) message = body.message
+        } catch {
+          // non-JSON response body, keep the fallback message
+        }
+        reject(Object.assign(new Error(message), { status: xhr.status }))
+      }
     }
     xhr.onerror = () => reject(new Error('Network error during upload'))
     xhr.send(file)

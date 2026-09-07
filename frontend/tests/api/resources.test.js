@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   listDirectory, makeDirectory, deleteItem, bulkDelete,
-  moveItem, renameItem, downloadUrl,
+  moveItem, renameItem, downloadUrl, uploadFile,
 } from '../../src/api/resources.js'
 
 describe('resources API', () => {
@@ -99,5 +99,33 @@ describe('resources API', () => {
       json: () => Promise.reject(new Error('not json')),
     })
     await expect(listDirectory('/x')).rejects.toThrow('Internal Server Error')
+  })
+
+  it('uploadFile rejects with status 401 on unauthorized', async () => {
+    let capturedOnload
+    const mockXhr = {
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn(),
+      upload: {},
+      status: 401,
+      responseText: '{"message":"Unauthorized"}',
+    }
+    const MockXhr = class {
+      constructor() {
+        return mockXhr
+      }
+    }
+    Object.defineProperty(mockXhr, 'onload', {
+      set: (fn) => { capturedOnload = fn },
+    })
+
+    vi.stubGlobal('XMLHttpRequest', MockXhr)
+
+    const uploadPromise = uploadFile('/test.txt', new File(['test'], 'test.txt'))
+    // Simulate xhr.onload being called
+    if (capturedOnload) capturedOnload()
+
+    await expect(uploadPromise).rejects.toMatchObject({ status: 401 })
   })
 })

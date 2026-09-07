@@ -42,12 +42,13 @@ onUnauthorized(() => { auth.user = null })
 async function handleFiles(fileList) {
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
   for (const file of Array.from(fileList)) {
-    const entry = reactive({ id: uploadId++, name: file.name, progress: 0, error: false })
+    const entry = reactive({ id: uploadId++, name: file.name, progress: 0, error: false, message: '' })
     uploads.push(entry)
     try {
       await uploadFile(`${base}${file.name}`, file, (pct) => { entry.progress = pct })
-    } catch {
+    } catch (err) {
       entry.error = true
+      entry.message = err.message || 'Failed'
     }
   }
   await files.loadDirectory(files.currentPath)
