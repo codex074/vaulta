@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { downloadUrl, previewUrl } from '../api/resources.js'
+import { pickImageSource } from './lightboxSrc.js'
 
 const props = defineProps({ entry: { type: Object, required: true } })
 defineEmits(['close'])
@@ -13,9 +14,32 @@ const kind = computed(() => {
 })
 const src = computed(() => downloadUrl(props.entry.path))
 const imagePreviewFailed = ref(false)
-watch(() => props.entry.path, () => { imagePreviewFailed.value = false })
+const originalLoaded = ref(false)
 const imageSrc = computed(() =>
-  props.entry.hasPreview && !imagePreviewFailed.value ? previewUrl(props.entry.path, 'large') : src.value
+  pickImageSource({
+    hasPreview: props.entry.hasPreview,
+    previewFailed: imagePreviewFailed.value,
+    originalLoaded: originalLoaded.value,
+  }) === 'preview'
+    ? previewUrl(props.entry.path, 'large')
+    : src.value
+)
+
+// Always ends up showing the true original — the preview above is only an
+// instant-loading placeholder while the full-quality file downloads in the background.
+watch(
+  () => props.entry.path,
+  (path) => {
+    imagePreviewFailed.value = false
+    originalLoaded.value = false
+    if (!props.entry.type.startsWith('image/')) return
+    const original = new Image()
+    original.onload = () => {
+      if (props.entry.path === path) originalLoaded.value = true
+    }
+    original.src = downloadUrl(path)
+  },
+  { immediate: true }
 )
 </script>
 
