@@ -1,14 +1,15 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { showError } from '../errorToast.js'
+import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
 
 const props = defineProps({
   entry: { type: Object, required: true },
   disableOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['open', 'menu'])
+const emit = defineEmits(['open', 'menu', 'changed'])
 const files = useFilesStore()
 
 const fullPath = computed(() =>
@@ -16,6 +17,39 @@ const fullPath = computed(() =>
 )
 const isSelected = computed(() => files.selected.has(fullPath.value))
 const isStarred = computed(() => props.entry.pinned ?? files.pinnedNames.has(props.entry.name))
+const isDropTarget = ref(false)
+const isDragging = ref(false)
+
+function onDragStart(event) {
+  beginDrag(event, selectionToDrag(fullPath.value, files.selected))
+  isDragging.value = true
+}
+function onDragEnd() {
+  isDragging.value = false
+}
+function onDragOver(event) {
+  if (props.disableOpen || props.entry.type !== 'directory' || !hasDragPayload(event)) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  isDropTarget.value = true
+}
+function onDragLeave() {
+  isDropTarget.value = false
+}
+async function onDrop(event) {
+  isDropTarget.value = false
+  if (props.disableOpen) return
+  const paths = dragPaths(event)
+  if (!isValidDropTarget(fullPath.value, props.entry.type === 'directory', paths)) return
+  event.preventDefault()
+  event.stopPropagation()
+  try {
+    await moveInto(paths, fullPath.value)
+    emit('changed')
+  } catch (err) {
+    showError(err.message || 'Could not move.')
+  }
+}
 
 async function onClick() {
   if (props.disableOpen) return
@@ -40,7 +74,16 @@ async function onStarClick() {
 </script>
 
 <template>
-  <div class="tile" :class="{ selected: isSelected }">
+  <div
+    class="tile"
+    :class="{ selected: isSelected, 'drop-target': isDropTarget, dragging: isDragging }"
+    :draggable="!disableOpen"
+    @dragstart="onDragStart"
+    @dragend="onDragEnd"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
     <input
       type="checkbox"
       class="select-box"
@@ -72,6 +115,8 @@ async function onStarClick() {
   gap: 6px;
 }
 .tile.selected { border-color: var(--accent); background: #eaf1ff; }
+.tile.dragging { opacity: 0.5; }
+.tile.drop-target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .thumb { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; }
 .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); }

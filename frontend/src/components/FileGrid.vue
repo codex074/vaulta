@@ -3,7 +3,7 @@ defineProps({
   entries: { type: Array, required: true },
   disableOpen: { type: Boolean, default: false },
 })
-defineEmits(['open', 'menu'])
+defineEmits(['open', 'menu', 'changed'])
 </script>
 
 <template>
@@ -15,6 +15,7 @@ defineEmits(['open', 'menu'])
       :disable-open="disableOpen"
       @open="$emit('open', $event)"
       @menu="$emit('menu', $event)"
+      @changed="$emit('changed')"
     />
   </div>
 </template>

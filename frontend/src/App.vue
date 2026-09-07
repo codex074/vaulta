@@ -156,6 +156,7 @@ async function onEmptyTrash() {
           :disable-open="view === 'trash'"
           @menu="activeMenu = $event"
           @open="previewing = $event"
+          @changed="onEntryChanged"
         />
         <FileListView
           v-else
@@ -163,6 +164,7 @@ async function onEmptyTrash() {
           :disable-open="view === 'trash'"
           @menu="activeMenu = $event"
           @open="previewing = $event"
+          @changed="onEntryChanged"
         />
       </div>
     </div>

@@ -1,14 +1,18 @@
 <script setup>
+import { ref } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { showError } from '../errorToast.js'
+import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
 
 const props = defineProps({
   entries: { type: Array, required: true },
   disableOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['open', 'menu'])
+const emit = defineEmits(['open', 'menu', 'changed'])
 const files = useFilesStore()
+const draggingPath = ref(null)
+const dropTargetPath = ref(null)
 
 function fullPath(entry) {
   return entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${entry.name}`
@@ -32,13 +36,56 @@ async function onStarClick(entry) {
     showError(err.message || 'Could not update star.')
   }
 }
+
+function onDragStart(event, entry) {
+  const path = fullPath(entry)
+  beginDrag(event, selectionToDrag(path, files.selected))
+  draggingPath.value = path
+}
+function onDragEnd() {
+  draggingPath.value = null
+}
+function onDragOver(event, entry) {
+  if (props.disableOpen || entry.type !== 'directory' || !hasDragPayload(event)) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  dropTargetPath.value = fullPath(entry)
+}
+function onDragLeave() {
+  dropTargetPath.value = null
+}
+async function onDrop(event, entry) {
+  dropTargetPath.value = null
+  if (props.disableOpen) return
+  const target = fullPath(entry)
+  const paths = dragPaths(event)
+  if (!isValidDropTarget(target, entry.type === 'directory', paths)) return
+  event.preventDefault()
+  event.stopPropagation()
+  try {
+    await moveInto(paths, target)
+    emit('changed')
+  } catch (err) {
+    showError(err.message || 'Could not move.')
+  }
+}
 </script>
 
 <template>
   <table class="list">
     <thead><tr><th></th><th></th><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead>
     <tbody>
-      <tr v-for="entry in entries" :key="entry.path || entry.name">
+      <tr
+        v-for="entry in entries"
+        :key="entry.path || entry.name"
+        :class="{ dragging: draggingPath === fullPath(entry), 'drop-target': dropTargetPath === fullPath(entry) }"
+        :draggable="!disableOpen"
+        @dragstart="onDragStart($event, entry)"
+        @dragend="onDragEnd"
+        @dragover="onDragOver($event, entry)"
+        @dragleave="onDragLeave"
+        @drop="onDrop($event, entry)"
+      >
         <td class="select-col">
           <input
             type="checkbox"
@@ -65,6 +112,8 @@ async function onStarClick(entry) {
 .list th { text-align: left; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 8px 16px; }
 .list td { padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
 .list td:nth-child(3) { cursor: pointer; }
+.list tr.dragging { opacity: 0.5; }
+.list tr.drop-target td { box-shadow: inset 0 0 0 2px var(--accent); }
 .list button { border: none; background: none; color: var(--text-muted); }
 .select-col, .star-col { width: 32px; }
 .star { font-size: 13px; }
