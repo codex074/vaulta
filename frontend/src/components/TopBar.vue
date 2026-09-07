@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
+import ThemeToggle from './ThemeToggle.vue'
 
 const emit = defineEmits(['new-folder', 'search', 'upload'])
 const files = useFilesStore()
@@ -38,6 +39,7 @@ async function goTo(path) {
     <button @click="files.toggleViewMode()">{{ files.viewMode === 'grid' ? '☰ List' : '▦ Grid' }}</button>
     <button @click="emit('upload')">⬆ Upload</button>
     <button @click="emit('new-folder')">+ New folder</button>
+    <ThemeToggle />
   </header>
 </template>
 

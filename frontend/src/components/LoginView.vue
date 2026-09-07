@@ -38,5 +38,5 @@ async function onSubmit() {
 .login-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; width: 280px; display: flex; flex-direction: column; gap: 12px; }
 .login-card input { padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
 .login-card button { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: 8px; padding: 10px; }
-.login-error { color: #d92d20; font-size: 13px; margin: 0; }
+.login-error { color: var(--danger); font-size: 13px; margin: 0; }
 </style>

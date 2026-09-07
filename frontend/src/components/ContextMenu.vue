@@ -75,6 +75,6 @@ function doDeleteForever() {
 .menu { position: absolute; top: 80px; right: 40px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: flex; flex-direction: column; padding: 6px; min-width: 160px; }
 .menu button, .menu a { text-align: left; border: none; background: none; padding: 8px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
 .menu button:hover, .menu a:hover { background: var(--bg); }
-.menu .danger { color: #d92d20; }
+.menu .danger { color: var(--danger); }
 .menu input { margin: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
 </style>

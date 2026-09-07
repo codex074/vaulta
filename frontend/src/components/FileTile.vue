@@ -79,7 +79,7 @@ async function onStarClick() {
   flex-direction: column;
   gap: 6px;
 }
-.tile.selected { border-color: var(--accent); background: #eaf1ff; }
+.tile.selected { border-color: var(--accent); background: var(--selected-bg); }
 .thumb { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
 .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
