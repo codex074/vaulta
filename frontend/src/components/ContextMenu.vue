@@ -1,12 +1,17 @@
 <script setup>
 import { ref } from 'vue'
-import { deleteItem, renameItem, moveItem, downloadUrl } from '../api/resources.js'
-import { useFilesStore } from '../stores/files.js'
+import { renameItem, moveItem, downloadUrl } from '../api/resources.js'
+import { softDelete } from '../api/trash.js'
+import { useTrashStore } from '../stores/trash.js'
 import { showError } from '../errorToast.js'
 
-const props = defineProps({ entry: { type: Object, required: true }, path: { type: String, required: true } })
-const emit = defineEmits(['close'])
-const files = useFilesStore()
+const props = defineProps({
+  entry: { type: Object, required: true },
+  path: { type: String, required: true },
+  view: { type: String, default: 'browse' },
+})
+const emit = defineEmits(['close', 'changed'])
+const trash = useTrashStore()
 const renaming = ref(false)
 const moving = ref(false)
 const newName = ref(props.entry.name)
@@ -20,11 +25,7 @@ async function refreshAfter(action) {
     return
   }
   emit('close')
-  try {
-    await files.loadDirectory(files.currentPath)
-  } catch (err) {
-    showError(err.message || 'Could not refresh folder.')
-  }
+  emit('changed')
 }
 
 function doRename() {
@@ -34,7 +35,13 @@ function doMove() {
   return refreshAfter(() => moveItem(props.path, destination.value))
 }
 function doDelete() {
-  return refreshAfter(() => deleteItem(props.path))
+  return refreshAfter(() => softDelete(props.path))
+}
+function doRestore() {
+  return refreshAfter(() => trash.restore(props.entry))
+}
+function doDeleteForever() {
+  return refreshAfter(() => trash.deleteForeverItem(props.entry))
 }
 </script>
 
@@ -48,6 +55,10 @@ function doDelete() {
       <template v-else-if="moving">
         <input v-model="destination" placeholder="/NewFolder/name.ext" autofocus @keyup.enter="doMove" />
         <button @click="doMove">Move</button>
+      </template>
+      <template v-else-if="view === 'trash'">
+        <button @click="doRestore">Restore</button>
+        <button class="danger" @click="doDeleteForever">Delete forever</button>
       </template>
       <template v-else>
         <button @click="renaming = true">Rename</button>
