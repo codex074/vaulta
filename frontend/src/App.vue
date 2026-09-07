@@ -206,6 +206,7 @@ async function onEmptyTrash() {
 #app-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 .main { flex: 1; display: flex; flex-direction: column; }

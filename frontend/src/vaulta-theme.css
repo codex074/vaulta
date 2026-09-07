@@ -142,6 +142,7 @@ input:focus-visible {
   box-shadow:
     0 34px 80px -34px rgba(var(--shadow-rgb), .85),
     inset 0 1px rgba(var(--sheen-rgb), .035);
+  -webkit-backdrop-filter: blur(22px);
   backdrop-filter: blur(22px);
 }
 
@@ -305,11 +306,13 @@ input:focus-visible {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   padding: 24px 14px 18px;
   gap: 6px;
   border-right: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface), transparent 4%);
   box-shadow: 16px 0 40px -34px rgba(var(--shadow-rgb), 1);
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 }
 
@@ -404,6 +407,7 @@ input:focus-visible {
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface), transparent 14%);
   box-shadow: 0 16px 44px -34px rgba(var(--shadow-rgb), 1);
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 }
 
@@ -568,6 +572,7 @@ input:focus-visible {
 #app .backdrop {
   padding: 20px;
   background: rgba(var(--shadow-rgb), .55);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 
@@ -585,6 +590,7 @@ input:focus-visible {
 #app .dialog.account-settings {
   width: min(560px, 100%);
   max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
   gap: 0;
   padding: 0;
   overflow-y: auto;
@@ -628,6 +634,7 @@ input:focus-visible {
   border-radius: 13px;
   background: color-mix(in srgb, var(--surface), transparent 2%);
   box-shadow: 0 22px 52px -22px rgba(var(--shadow-rgb), 1);
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
 
