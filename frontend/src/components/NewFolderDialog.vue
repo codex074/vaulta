@@ -2,27 +2,31 @@
 import { ref } from 'vue'
 import { makeDirectory } from '../api/resources.js'
 import { useFilesStore } from '../stores/files.js'
+import { showError } from '../errorToast.js'
 
 const emit = defineEmits(['close'])
 const files = useFilesStore()
 const name = ref('')
-const errorMessage = ref('')
 const submitting = ref(false)
 
 async function onSubmit() {
   if (!name.value.trim()) return
   submitting.value = true
-  errorMessage.value = ''
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
   try {
     await makeDirectory(`${base}${name.value.trim()}`)
-    await files.loadDirectory(files.currentPath)
-    emit('close')
   } catch (err) {
-    errorMessage.value = 'Could not create folder.'
-  } finally {
+    showError(err.message || 'Could not create folder.')
     submitting.value = false
+    return
   }
+  emit('close')
+  try {
+    await files.loadDirectory(files.currentPath)
+  } catch (err) {
+    showError(err.message || 'Could not refresh folder.')
+  }
+  submitting.value = false
 }
 </script>
 
@@ -32,7 +36,6 @@ async function onSubmit() {
       <h3>New folder</h3>
       <p class="hint">You can type a path like <code>Photos/2026</code> to create nested folders at once.</p>
       <input v-model="name" placeholder="Folder name" autofocus />
-      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
       <div class="actions">
         <button type="button" @click="emit('close')">Cancel</button>
         <button type="submit" :disabled="submitting">Create</button>
@@ -47,5 +50,4 @@ async function onSubmit() {
 .hint { font-size: 12px; color: var(--text-muted); margin: 0; }
 .dialog input { padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; }
-.error { color: #d92d20; font-size: 13px; margin: 0; }
 </style>

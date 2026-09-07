@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { deleteItem, renameItem, moveItem, downloadUrl } from '../api/resources.js'
 import { useFilesStore } from '../stores/files.js'
+import { showError } from '../errorToast.js'
 
 const props = defineProps({ entry: { type: Object, required: true }, path: { type: String, required: true } })
 const emit = defineEmits(['close'])
@@ -10,37 +11,30 @@ const renaming = ref(false)
 const moving = ref(false)
 const newName = ref(props.entry.name)
 const destination = ref('')
-const errorMessage = ref('')
 
-async function doRename() {
-  errorMessage.value = ''
+async function refreshAfter(action) {
   try {
-    await renameItem(props.path, newName.value)
-    await files.loadDirectory(files.currentPath)
-    emit('close')
+    await action()
   } catch (err) {
-    errorMessage.value = err.message || 'Rename failed.'
+    showError(err.message || 'Action failed.')
+    return
+  }
+  emit('close')
+  try {
+    await files.loadDirectory(files.currentPath)
+  } catch (err) {
+    showError(err.message || 'Could not refresh folder.')
   }
 }
-async function doMove() {
-  errorMessage.value = ''
-  try {
-    await moveItem(props.path, destination.value)
-    await files.loadDirectory(files.currentPath)
-    emit('close')
-  } catch (err) {
-    errorMessage.value = err.message || 'Move failed.'
-  }
+
+function doRename() {
+  return refreshAfter(() => renameItem(props.path, newName.value))
 }
-async function doDelete() {
-  errorMessage.value = ''
-  try {
-    await deleteItem(props.path)
-    await files.loadDirectory(files.currentPath)
-    emit('close')
-  } catch (err) {
-    errorMessage.value = err.message || 'Delete failed.'
-  }
+function doMove() {
+  return refreshAfter(() => moveItem(props.path, destination.value))
+}
+function doDelete() {
+  return refreshAfter(() => deleteItem(props.path))
 }
 </script>
 
@@ -58,10 +52,9 @@ async function doDelete() {
       <template v-else>
         <button @click="renaming = true">Rename</button>
         <button @click="moving = true">Move</button>
-        <a :href="downloadUrl(path)" target="_blank">Download</a>
+        <a :href="downloadUrl(path)" target="_blank" rel="noopener noreferrer">Download</a>
         <button class="danger" @click="doDelete">Delete</button>
       </template>
-      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </div>
   </div>
 </template>
@@ -73,5 +66,4 @@ async function doDelete() {
 .menu button:hover, .menu a:hover { background: var(--bg); }
 .menu .danger { color: #d92d20; }
 .menu input { margin: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
-.menu .error { color: #d92d20; font-size: 12px; margin: 6px; }
 </style>
