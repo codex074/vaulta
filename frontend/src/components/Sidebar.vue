@@ -15,6 +15,11 @@ const usagePercent = computed(() => {
   if (!totalBytes.value) return 0
   return Math.min(100, Math.round((usedBytes.value / totalBytes.value) * 100))
 })
+const fillColor = computed(() => {
+  if (usagePercent.value >= 90) return '#d92d20'
+  if (usagePercent.value >= 75) return '#f79009'
+  return 'var(--accent)'
+})
 
 let intervalId = null
 async function refreshStorage() {
@@ -41,15 +46,15 @@ onUnmounted(() => {
   <nav class="sidebar">
     <button class="sidebar-item" :class="{ active: view === 'browse' }" @click="emit('navigate', 'browse')">
       <span class="sidebar-icon">🏠</span>
-      <span class="sidebar-label">หน้าแรก</span>
+      <span class="sidebar-label">Home</span>
     </button>
     <button class="sidebar-item" :class="{ active: view === 'starred' }" @click="emit('navigate', 'starred')">
       <span class="sidebar-icon">⭐</span>
-      <span class="sidebar-label">ที่ติดดาว</span>
+      <span class="sidebar-label">Starred</span>
     </button>
     <button class="sidebar-item" :class="{ active: view === 'trash' }" @click="emit('navigate', 'trash')">
       <span class="sidebar-icon">🗑️</span>
-      <span class="sidebar-label">ถังขยะ</span>
+      <span class="sidebar-label">Trash</span>
     </button>
     <button class="sidebar-item" @click="emit('upload')">
       <span class="sidebar-icon">⬆️</span>
@@ -57,8 +62,12 @@ onUnmounted(() => {
     </button>
     <div class="sidebar-spacer"></div>
     <div v-if="!storageError" class="storage">
-      <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%' }"></div></div>
-      <div class="storage-label">{{ formatSize(usedBytes) }} / {{ formatSize(totalBytes) }}</div>
+      <div class="storage-header">
+        <span class="storage-icon">☁️</span>
+        <span>Storage</span>
+      </div>
+      <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%', background: fillColor }"></div></div>
+      <div class="storage-label">{{ formatSize(usedBytes) }} of {{ formatSize(totalBytes) }} used</div>
     </div>
     <button class="sidebar-item" @click="auth.signOut()">
       <span class="sidebar-icon">👤</span>
@@ -98,9 +107,27 @@ onUnmounted(() => {
 .sidebar-item.active:hover { background: var(--border); }
 .sidebar-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
 .sidebar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.storage { padding: 8px 12px 4px; display: flex; flex-direction: column; gap: 4px; }
-.storage-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.storage-fill { height: 100%; background: var(--accent); }
+.storage {
+  margin: 4px 4px 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.storage-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.storage-icon { font-size: 13px; }
+.storage-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.storage-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease, background 0.3s ease; }
 .storage-label { font-size: 11px; color: var(--text-muted); }
 
 @media (max-width: 640px) {
