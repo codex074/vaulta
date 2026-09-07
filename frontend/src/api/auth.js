@@ -1,10 +1,4 @@
-import { authorizedFetch } from './http.js'
-
-async function apiError(response) {
-  const err = new Error(response.statusText || 'Request failed')
-  err.status = response.status
-  return err
-}
+import { authorizedFetch, apiError } from './http.js'
 
 export async function login(username, password) {
   const url = `/api/auth/login?username=${encodeURIComponent(username)}&recaptcha=`

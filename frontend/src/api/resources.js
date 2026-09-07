@@ -1,12 +1,6 @@
-import { authorizedFetch } from './http.js'
+import { authorizedFetch, apiError } from './http.js'
 
 const SOURCE = 'share'
-
-async function apiError(response) {
-  const err = new Error(response.statusText || 'Request failed')
-  err.status = response.status
-  return err
-}
 
 function resourcesUrl(path, extraParams = {}) {
   const params = new URLSearchParams({ path, source: SOURCE, ...extraParams })

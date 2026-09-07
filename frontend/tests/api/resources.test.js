@@ -78,4 +78,26 @@ describe('resources API', () => {
   it('downloadUrl builds a plain GET link', () => {
     expect(downloadUrl('/Photos/a.jpg')).toBe('/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share')
   })
+
+  it('listDirectory throws the message from the JSON error body', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      clone() { return this },
+      json: () => Promise.resolve({ status: 404, message: 'lstat /srv/share/x.txt: no such file or directory' }),
+    })
+    await expect(listDirectory('/x')).rejects.toThrow('lstat /srv/share/x.txt: no such file or directory')
+  })
+
+  it('listDirectory falls back to statusText when the body is not JSON', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      clone() { return this },
+      json: () => Promise.reject(new Error('not json')),
+    })
+    await expect(listDirectory('/x')).rejects.toThrow('Internal Server Error')
+  })
 })
