@@ -11,6 +11,15 @@ The login username remains a credential, while a separate UID-keyed profile
 stores the user-editable display name. Existing users need no data migration:
 until they save a display name, their login username is displayed.
 
+FileBrowser Quantum serves two sources: `share` (`/srv/share`, the existing
+shared area — unchanged behavior for every user) and `home` (`/srv/home`,
+each user's private drive, isolated by FBQ's own per-user scopes). `nasapi`
+enforces a per-user storage quota on `home` writes: it sits in front of FBQ
+as a reverse-proxy gate on `POST`/`PATCH`/`DELETE` to `/api/resources`,
+checking a write against the caller's admin-set quota before forwarding it
+on. `GET` (listing, download, preview, search) always goes straight to FBQ,
+so reads never depend on `nasapi` being up.
+
 ## Local development
 
 ```bash
@@ -58,14 +67,29 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 - Bind mount: `/mnt/tank/share:/srv/share:ro` — read-only, and required. The
   `nasapi` sidecar `statfs()`s this path to report real disk usage for the
   sidebar's storage bar; without the mount the storage endpoint fails
+- Bind mount: `/mnt/tank/home:/srv/home:ro` — read-only, and required for
+  quota enforcement. `nasapi` walks each user's home scope under this path
+  to compute `usedBytes`; FBQ itself mounts the same ZFS dataset read-write
+  separately, since `nasapi` only ever reads, never writes, drive contents
 - Bind mount: `/mnt/.ix-apps/app_mounts/nas-webui/config:/var/lib/vaulta` —
-  read-write and required for persistent UID-keyed display-name profiles. The
-  FileBrowser numeric user ID is the immutable UID; existing login usernames
-  remain unchanged and become the initial display name automatically
+  read-write and required for persistent UID-keyed display-name profiles,
+  file ownership records, and per-user storage quotas (`profiles.json`,
+  `ownership.json`, `quotas.json`). The FileBrowser numeric user ID is the
+  immutable UID; existing login usernames remain unchanged and become the
+  initial display name automatically
+- Env vars: `NASAPI_SHARE_PATH` (default `/srv/share`) and
+  `NASAPI_HOME_PATH` (default `/srv/home`) tell `nasapi` where each source
+  lives on disk, matching the two bind mounts above
 - The container runs two processes, started by `docker/entrypoint.sh`: nginx
   (serving the SPA and reverse-proxying `/api/*` to FileBrowser Quantum) and a
-  small `nasapi` binary listening on `127.0.0.1:9190`, which serves
-  `/nasapi/storage` and is reverse-proxied by nginx alongside `/api/*`
+  small `nasapi` binary listening on `127.0.0.1:9190`, respawned by
+  `entrypoint.sh` if it ever crashes. It serves `/nasapi/storage` and other
+  sidecar endpoints (reverse-proxied by nginx alongside `/api/*`), and also
+  sits in front of FBQ as a quota-enforcing gate: nginx routes
+  `POST`/`PATCH`/`DELETE` on `/api/resources` to `nasapi` first, which
+  checks writes into a user's `home` drive against their admin-set quota
+  before forwarding the request on to FBQ (`GET` on the same path, and every
+  other `/api/*` path, goes straight to FBQ unaffected)
 - The public Cloudflare Tunnel ingress rule for `nas.codex074.com` points at
   `http://localhost:8090` (this app), not at FileBrowser Quantum directly.
   FileBrowser Quantum's own UI remains reachable only on the LAN at
@@ -83,6 +107,10 @@ TrueNAS's Apps UI), alongside the existing `filebrowser-quantum` and
 - `docker/Dockerfile`, `docker/nginx.conf` — production container build and
   nginx reverse-proxy config
 - `docker/nasapi/` — the Go sidecar serving `/nasapi/storage` plus authenticated
-  UID profile endpoints under `/nasapi/profile*`
+  UID profile endpoints under `/nasapi/profile*`, quota endpoints under
+  `/nasapi/quota*`, and the `/api/resources` reverse-proxy gate that enforces
+  those quotas on writes into a user's `home` drive (`quota.go`, `usage.go`,
+  `gate.go`)
 - `docker/entrypoint.sh` — container entrypoint, starts both processes
-  (`nasapi` in the background, then nginx in the foreground)
+  (`nasapi` in a restart loop in the background, then nginx in the
+  foreground)
