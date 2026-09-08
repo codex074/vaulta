@@ -6,6 +6,7 @@ import { listProfiles, updateUserDisplayName, deleteUserProfile } from '../api/p
 import { listQuotas, setUserQuota, deleteUserQuota, gbToBytes, bytesToGb } from '../api/quota.js'
 import { makeDirectory } from '../api/resources.js'
 import { formatSize } from './fileFormat.js'
+import { driveStatus } from './quotaMath.js'
 
 const emit = defineEmits(['close'])
 const auth = useAuthStore()
@@ -33,7 +34,17 @@ function hasHomeScope(user) {
   return Boolean(user.scopes?.some((s) => s.name === 'home'))
 }
 
+// A non-admin whose home scope isn't their own folder (e.g. `/` after an
+// FBQ restart with the source still defaultEnabled) needs the same
+// mkdir + scope PUT as a user with no drive at all; the button just reads
+// "Fix drive" instead of "Assign drive".
+function needsDriveFix(user) {
+  return !driveStatus(user).ok && user.id !== auth.user?.id
+}
+
 function quotaRowText(user) {
+  const status = driveStatus(user)
+  if (status.hasScope && !status.ok) return `Drive scope is ${status.scope} — should be ${status.expected}`
   const q = user.quota
   if (!q || !q.hasDrive) return 'No drive'
   if (q.unlimited) return `${formatSize(q.usedBytes)} used · Unlimited`
@@ -283,12 +294,12 @@ async function enableMyDriveAccess() {
             </template>
 
             <button
-              v-if="!hasHomeScope(user) && user.id !== auth.user?.id"
+              v-if="needsDriveFix(user)"
               type="button"
               :disabled="!auth.hasHomeDrive || assigningUid === user.uid"
               @click="assignDrive(user)"
             >
-              {{ assigningUid === user.uid ? 'Assigning…' : 'Assign drive' }}
+              {{ assigningUid === user.uid ? 'Assigning…' : (hasHomeScope(user) ? 'Fix drive' : 'Assign drive') }}
             </button>
 
             <button

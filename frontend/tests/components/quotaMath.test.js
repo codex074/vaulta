@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { quotaPercent, quotaFillColor, quotaLabel } from '../../src/components/quotaMath.js'
+import { quotaPercent, quotaFillColor, quotaLabel, driveStatus } from '../../src/components/quotaMath.js'
 
 const GIB = 1024 ** 3
 
@@ -50,5 +50,28 @@ describe('quotaLabel', () => {
 
   it('reports just usage for an unlimited (admin) drive', () => {
     expect(quotaLabel({ hasDrive: true, unlimited: true, limitBytes: 0, usedBytes: 2 * GIB })).toBe('2.0 GB used')
+  })
+})
+
+describe('driveStatus', () => {
+  const alice = { username: 'alice', permissions: { admin: false }, scopes: [{ name: 'share', scope: '/' }, { name: 'home', scope: '/alice' }] }
+
+  it('reports a correctly scoped non-admin drive as ok', () => {
+    expect(driveStatus(alice)).toEqual({ hasScope: true, scope: '/alice', expected: '/alice', ok: true })
+  })
+
+  it('flags a missing home scope', () => {
+    expect(driveStatus({ ...alice, scopes: [{ name: 'share', scope: '/' }] })).toEqual({ hasScope: false, scope: null, expected: '/alice', ok: false })
+  })
+
+  it('flags a non-admin whose home scope is the shared root (FBQ defaultEnabled merge)', () => {
+    const merged = { ...alice, scopes: [{ name: 'share', scope: '/' }, { name: 'home', scope: '/' }] }
+    expect(driveStatus(merged)).toEqual({ hasScope: true, scope: '/', expected: '/alice', ok: false })
+  })
+
+  it('accepts any home scope for an admin, but still reports a missing one', () => {
+    const admin = { username: 'root', permissions: { admin: true }, scopes: [{ name: 'home', scope: '/' }] }
+    expect(driveStatus(admin)).toEqual({ hasScope: true, scope: '/', expected: '/', ok: true })
+    expect(driveStatus({ ...admin, scopes: [] })).toEqual({ hasScope: false, scope: null, expected: '/', ok: false })
   })
 })
