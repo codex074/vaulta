@@ -92,8 +92,9 @@ export async function renameItem(path, newName) {
   return moveItem(path, toPath)
 }
 
-export function downloadUrl(path) {
+export function downloadUrl(path, { inline = false } = {}) {
   const params = new URLSearchParams({ file: path, source: SOURCE })
+  if (inline) params.set('inline', 'true')
   return `/api/resources/download?${params.toString()}`
 }
 

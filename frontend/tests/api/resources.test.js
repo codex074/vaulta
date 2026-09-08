@@ -90,6 +90,16 @@ describe('resources API', () => {
     expect(downloadUrl('/Photos/a.jpg')).toBe('/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share')
   })
 
+  it('downloadUrl accepts an inline option for browser-native preview', () => {
+    expect(downloadUrl('/Photos/a.jpg', { inline: true })).toBe(
+      '/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share&inline=true'
+    )
+  })
+
+  it('downloadUrl omits inline entirely when not requested', () => {
+    expect(downloadUrl('/Photos/a.jpg', {})).toBe('/api/resources/download?file=%2FPhotos%2Fa.jpg&source=share')
+  })
+
   it('previewUrl defaults to small size', () => {
     expect(previewUrl('/Photos/a.jpg')).toBe('/api/resources/preview?path=%2FPhotos%2Fa.jpg&source=share&size=small')
   })
