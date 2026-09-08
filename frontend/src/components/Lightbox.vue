@@ -111,12 +111,13 @@ function onOfficeLoadError() {
 </script>
 
 <template>
-  <div v-if="kind === 'office' && officeConfig && !officeFailed" class="office-panel">
-    <div class="office-topbar">
-      <button class="office-back" @click="$emit('close')">← กลับ</button>
-      <span class="office-filename">{{ entry.name }}</span>
+  <div v-if="kind === 'pdf' || (kind === 'office' && officeConfig && !officeFailed)" class="doc-panel">
+    <div class="doc-topbar">
+      <button class="doc-back" @click="$emit('close')">← กลับ</button>
+      <span class="doc-filename">{{ entry.name }}</span>
     </div>
-    <div class="office-frame">
+    <iframe v-if="kind === 'pdf'" class="doc-frame" :src="pdfSrc" title="PDF preview" />
+    <div v-else class="doc-frame">
       <DocumentEditor
         id="vaulta-office-editor"
         :document-server-url="officeUrl"
@@ -132,7 +133,6 @@ function onOfficeLoadError() {
       <button class="close" @click="$emit('close')">✕</button>
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
-      <iframe v-else-if="kind === 'pdf'" :src="pdfSrc" title="PDF preview" />
       <div v-else class="fallback">
         <p>{{ entry.name }}</p>
         <a :href="src" target="_blank">Download</a>
@@ -148,14 +148,14 @@ function onOfficeLoadError() {
 .frame :deep(.plyr) { max-width: 80vw; max-height: 75vh; }
 .frame :deep(.plyr__video-wrapper) { max-height: 75vh; }
 .frame :deep(video) { max-height: 75vh; }
-.frame iframe { width: 70vw; height: 80vh; border: none; }
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
 .fallback { text-align: center; }
 
-/* Full-screen: a slim header strip of our own above the editor, never
-   overlapping OnlyOffice's own toolbar (which spans the full top edge
-   and would otherwise sit under a floating close button). */
-.office-panel {
+/* Full-screen: a slim header strip of our own above the viewer, never
+   overlapping OnlyOffice's own toolbar or the browser's native PDF
+   controls (both span the full top edge and would otherwise sit under
+   a floating close button). Shared by PDF and OnlyOffice documents. */
+.doc-panel {
   position: fixed;
   inset: 0;
   z-index: 31;
@@ -163,7 +163,7 @@ function onOfficeLoadError() {
   flex-direction: column;
   background: var(--bg-elevated);
 }
-.office-topbar {
+.doc-topbar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -172,7 +172,7 @@ function onOfficeLoadError() {
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
 }
-.office-back {
+.doc-back {
   flex-shrink: 0;
   border: none;
   border-radius: 999px;
@@ -182,7 +182,7 @@ function onOfficeLoadError() {
   font-size: 14px;
   font-weight: 600;
 }
-.office-filename {
+.doc-filename {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,7 +190,7 @@ function onOfficeLoadError() {
   font-size: 13px;
   color: var(--text-muted);
 }
-.office-frame { flex: 1; min-height: 0; }
-.office-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
-.office-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
+.doc-frame { flex: 1; min-height: 0; border: none; }
+.doc-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
+.doc-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
 </style>

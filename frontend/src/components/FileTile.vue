@@ -152,8 +152,15 @@ async function onStarClick() {
 .tile.drop-target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .thumb { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
-.folder-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 100%; height: 100%; }
-.folder-grid img { width: 100%; height: 100%; object-fit: cover; }
+.folder-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 2px;
+}
+.folder-grid img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .folder-badge {
   position: absolute;
   bottom: 4px;
