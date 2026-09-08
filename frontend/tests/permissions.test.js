@@ -56,32 +56,50 @@ describe('partitionDeletable', () => {
       { name: 'mine.jpg', uploadedByUid: '3' },
       { name: 'yours.jpg', uploadedByUid: '2' },
     ]
-    const selected = new Set(['/Photos/mine.jpg', '/Photos/yours.jpg'])
-    const { allowed, blocked } = partitionDeletable(entries, selected, stranger, '/Photos')
+    const selected = new Set(['share:/Photos/mine.jpg', 'share:/Photos/yours.jpg'])
+    const { allowed, blocked } = partitionDeletable(entries, selected, stranger, '/Photos', 'share')
     expect(allowed.map((e) => e.path)).toEqual(['/Photos/mine.jpg'])
     expect(blocked.map((e) => e.path)).toEqual(['/Photos/yours.jpg'])
   })
 
   it('only considers entries that are actually selected', () => {
     const entries = [{ name: 'a.jpg', uploadedByUid: '3' }, { name: 'b.jpg', uploadedByUid: '3' }]
-    const selected = new Set(['/Photos/a.jpg'])
-    const { allowed, blocked } = partitionDeletable(entries, selected, stranger, '/Photos')
+    const selected = new Set(['share:/Photos/a.jpg'])
+    const { allowed, blocked } = partitionDeletable(entries, selected, stranger, '/Photos', 'share')
     expect(allowed).toHaveLength(1)
     expect(blocked).toHaveLength(0)
   })
 
   it('uses an entry\'s own .path when present (starred/trash views)', () => {
     const entries = [{ name: 'a.jpg', path: '/.trash/1__a.jpg', uploadedByUid: '2' }]
-    const selected = new Set(['/.trash/1__a.jpg'])
-    const { allowed } = partitionDeletable(entries, selected, owner, '/irrelevant')
+    const selected = new Set(['share:/.trash/1__a.jpg'])
+    const { allowed } = partitionDeletable(entries, selected, owner, '/irrelevant', 'share')
     expect(allowed).toHaveLength(1)
   })
 
   it('lets an admin delete everything selected', () => {
     const entries = [{ name: 'a.jpg', uploadedByUid: '2' }, { name: 'b.jpg', uploadedByUid: '3' }]
-    const selected = new Set(['/Photos/a.jpg', '/Photos/b.jpg'])
-    const { allowed, blocked } = partitionDeletable(entries, selected, admin, '/Photos')
+    const selected = new Set(['share:/Photos/a.jpg', 'share:/Photos/b.jpg'])
+    const { allowed, blocked } = partitionDeletable(entries, selected, admin, '/Photos', 'share')
     expect(allowed).toHaveLength(2)
     expect(blocked).toHaveLength(0)
+  })
+
+  it('resolves an entry\'s own source over the default, stamping it onto the returned item', () => {
+    const entries = [{ name: 'a.jpg', path: '/a.jpg', source: 'home' }]
+    const selected = new Set(['home:/a.jpg'])
+    const { allowed } = partitionDeletable(entries, selected, owner, '/irrelevant', 'share')
+    expect(allowed).toEqual([{ name: 'a.jpg', path: '/a.jpg', source: 'home' }])
+  })
+
+  it('does not confuse two entries with the same relative path on different drives', () => {
+    const entries = [
+      { name: 'a.jpg' },
+      { name: 'a.jpg', source: 'home' },
+    ]
+    const selected = new Set(['home:/a.jpg'])
+    const { allowed } = partitionDeletable(entries, selected, owner, '/', 'share')
+    expect(allowed).toHaveLength(1)
+    expect(allowed[0].source).toBe('home')
   })
 })

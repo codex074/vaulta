@@ -5,6 +5,7 @@ import { formatSize, formatRelativeTime, iconFor, pickFolderPreviewPaths } from 
 import { previewUrl, listDirectory } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
+import { selectionKey } from './pathHelpers.js'
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -16,7 +17,8 @@ const files = useFilesStore()
 const fullPath = computed(() =>
   props.entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${props.entry.name}`
 )
-const isSelected = computed(() => files.selected.has(fullPath.value))
+const selKey = computed(() => selectionKey(props.entry, files.currentPath, files.source))
+const isSelected = computed(() => files.selected.has(selKey.value))
 const isStarred = computed(() => props.entry.pinned ?? files.pinnedNames.has(props.entry.name))
 const isDropTarget = ref(false)
 const isDragging = ref(false)
@@ -114,7 +116,7 @@ async function onStarClick() {
       type="checkbox"
       class="select-box"
       :checked="isSelected"
-      @click.stop="files.toggleSelect(fullPath)"
+      @click.stop="files.toggleSelect(selKey)"
     />
     <button class="dots" @click.stop="emit('menu', { entry, path: fullPath })">⋮</button>
     <button v-if="!disableOpen" class="star" :class="{ starred: isStarred }" @click.stop="onStarClick">

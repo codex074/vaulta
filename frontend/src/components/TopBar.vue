@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
 import { dragPaths, isValidDropTarget, hasDragPayload, isWithin, moveInto } from './dragMove.js'
-import { entryPath } from './pathHelpers.js'
+import { selectionKey } from './pathHelpers.js'
 import ThemeToggle from './ThemeToggle.vue'
 import UiIcon from './UiIcon.vue'
 
@@ -16,11 +16,11 @@ const dropTargetPath = ref(null)
 
 const allSelected = computed(() =>
   props.entries.length > 0 &&
-  props.entries.every((entry) => files.selected.has(entryPath(entry, files.currentPath)))
+  props.entries.every((entry) => files.selected.has(selectionKey(entry, files.currentPath, files.source)))
 )
 function onToggleSelectAll() {
   if (allSelected.value) files.clearSelection()
-  else files.selectAllPaths(props.entries.map((entry) => entryPath(entry, files.currentPath)))
+  else files.selectAllPaths(props.entries.map((entry) => selectionKey(entry, files.currentPath, files.source)))
 }
 
 const crumbs = computed(() => {

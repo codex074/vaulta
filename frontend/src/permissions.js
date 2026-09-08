@@ -1,3 +1,5 @@
+import { entryPath, selectionKey } from './components/pathHelpers.js'
+
 // Client-side courtesy gate, not a security boundary: it hides delete
 // controls for files someone else uploaded, matching this app's existing
 // client-orchestrated trash/starred pattern. An owner-less entry (upload
@@ -20,13 +22,19 @@ export function fullPathFor(entry, currentPath) {
   return `${base}${entry.name}`
 }
 
-export function partitionDeletable(entries, selectedPaths, user, currentPath) {
+// selectedKeys holds source:path selection keys (see pathHelpers.js), so
+// membership is checked the same way the selection was built — an entry
+// with no source of its own falls back to defaultSource (the currently
+// browsed drive), matching selectionKey's own fallback.
+export function partitionDeletable(entries, selectedKeys, user, currentPath, defaultSource) {
   const allowed = []
   const blocked = []
   for (const entry of entries) {
-    const path = fullPathFor(entry, currentPath)
-    if (!selectedPaths.has(path)) continue
-    const withPath = { ...entry, path }
+    const key = selectionKey(entry, currentPath, defaultSource)
+    if (!selectedKeys.has(key)) continue
+    const source = entry.source ?? defaultSource
+    const path = entryPath(entry, currentPath)
+    const withPath = { ...entry, source, path }
     ;(canDeleteEntry(entry, user) ? allowed : blocked).push(withPath)
   }
   return { allowed, blocked }

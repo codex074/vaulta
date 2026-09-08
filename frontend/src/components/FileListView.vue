@@ -5,6 +5,7 @@ import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
+import { selectionKey } from './pathHelpers.js'
 
 const failedThumbs = reactive(new Set())
 
@@ -20,12 +21,15 @@ const dropTargetPath = ref(null)
 function fullPath(entry) {
   return entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${entry.name}`
 }
+function selKey(entry) {
+  return selectionKey(entry, files.currentPath, files.source)
+}
 const allSelected = computed(() =>
-  props.entries.length > 0 && props.entries.every((entry) => files.selected.has(fullPath(entry)))
+  props.entries.length > 0 && props.entries.every((entry) => files.selected.has(selKey(entry)))
 )
 function onToggleSelectAll() {
   if (allSelected.value) files.clearSelection()
-  else files.selectAllPaths(props.entries.map(fullPath))
+  else files.selectAllPaths(props.entries.map(selKey))
 }
 async function onClick(entry) {
   if (props.disableOpen) return
@@ -111,8 +115,8 @@ async function onDrop(event, entry) {
         <td class="select-col">
           <input
             type="checkbox"
-            :checked="files.selected.has(fullPath(entry))"
-            @click.stop="files.toggleSelect(fullPath(entry))"
+            :checked="files.selected.has(selKey(entry))"
+            @click.stop="files.toggleSelect(selKey(entry))"
           />
         </td>
         <td class="star-col">
