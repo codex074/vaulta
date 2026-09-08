@@ -27,6 +27,11 @@ describe('files store', () => {
     vi.clearAllMocks()
   })
 
+  it('defaults to the share source', () => {
+    const store = useFilesStore()
+    expect(store.source).toBe('share')
+  })
+
   it('loadDirectory stores folders before files, both alphabetized', async () => {
     resources.listDirectory.mockResolvedValue({
       path: '/', source: 'share',
@@ -37,6 +42,33 @@ describe('files store', () => {
     await store.loadDirectory('/')
     expect(store.entries.map((e) => e.name)).toEqual(['Alpha', 'Zeta', 'a.txt', 'b.txt'])
     expect(store.currentPath).toBe('/')
+  })
+
+  it('loadDirectory calls listDirectory with the store\'s current source', async () => {
+    resources.listDirectory.mockResolvedValue({ path: '/', source: 'share', folders: [], files: [] })
+    const store = useFilesStore()
+    await store.loadDirectory('/Photos')
+    expect(resources.listDirectory).toHaveBeenCalledWith('share', '/Photos')
+  })
+
+  it('loadDirectory stamps every entry with the store\'s current source', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/', source: 'share', folders: [{ name: 'Photos', type: 'directory' }], files: [{ name: 'a.txt', type: 'text/plain' }],
+    })
+    const store = useFilesStore()
+    await store.loadDirectory('/')
+    expect(store.entries.every((e) => e.source === 'share')).toBe(true)
+  })
+
+  it('loadDirectory skips the ownership lookup entirely for the home source', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/', source: 'home', folders: [], files: [{ name: 'a.jpg', type: 'image/jpeg' }],
+    })
+    const store = useFilesStore()
+    store.source = 'home'
+    await store.loadDirectory('/')
+    expect(ownership.lookupOwnership).not.toHaveBeenCalled()
+    expect(store.entries[0].source).toBe('home')
   })
 
   it('defaults to grid view and toggles to list, persisting the choice', () => {
@@ -68,19 +100,37 @@ describe('files store', () => {
     expect(store.selected).toEqual(new Set(['/a.jpg', '/b.jpg']))
   })
 
-  it('deleteSelected calls softDelete for each selected path and clears selection', async () => {
+  it('switchDrive changes the source and reloads the root of that drive', async () => {
+    resources.listDirectory.mockResolvedValue({ path: '/', source: 'home', folders: [], files: [] })
+    const store = useFilesStore()
+    store.currentPath = '/Photos'
+    await store.switchDrive('home')
+    expect(store.source).toBe('home')
+    expect(resources.listDirectory).toHaveBeenCalledWith('home', '/')
+    expect(store.currentPath).toBe('/')
+  })
+
+  it('deleteSelected calls softDelete with the store\'s current source for each selected path by default', async () => {
     trash.softDelete.mockResolvedValue(undefined)
     const store = useFilesStore()
     store.toggleSelect('/a.jpg')
     store.toggleSelect('/b.jpg')
     await store.deleteSelected()
-    expect(trash.softDelete).toHaveBeenCalledWith('/a.jpg')
-    expect(trash.softDelete).toHaveBeenCalledWith('/b.jpg')
+    expect(trash.softDelete).toHaveBeenCalledWith('share', '/a.jpg')
+    expect(trash.softDelete).toHaveBeenCalledWith('share', '/b.jpg')
     expect(store.selected.size).toBe(0)
   })
 
+  it('deleteSelected accepts an explicit list of {source,path} items spanning drives', async () => {
+    trash.softDelete.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    await store.deleteSelected([{ source: 'home', path: '/a.jpg' }, { source: 'share', path: '/b.jpg' }])
+    expect(trash.softDelete).toHaveBeenCalledWith('home', '/a.jpg')
+    expect(trash.softDelete).toHaveBeenCalledWith('share', '/b.jpg')
+  })
+
   it('deleteSelected throws listing the paths that failed, but still clears selection', async () => {
-    trash.softDelete.mockImplementation((path) =>
+    trash.softDelete.mockImplementation((source, path) =>
       path === '/bad.jpg' ? Promise.reject(new Error('boom')) : Promise.resolve()
     )
     const store = useFilesStore()
@@ -144,6 +194,15 @@ describe('files store', () => {
     expect(store.pinnedNames.has('a.txt')).toBe(true)
   })
 
+  it('toggleStar uses the entry\'s own source when it differs from the currently browsed drive', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    store.currentPath = '/'
+    store.source = 'share'
+    await store.toggleStar({ name: 'a.jpg', path: '/a.jpg', source: 'home', pinned: true })
+    expect(pinned.togglePinned).toHaveBeenCalledWith({ name: 'a.jpg', path: '/', source: 'home' }, 'remove')
+  })
+
   it('toggleStar unpins an already-pinned item', async () => {
     pinned.togglePinned.mockResolvedValue(undefined)
     const store = useFilesStore()
@@ -178,11 +237,23 @@ describe('files store', () => {
     const store = useFilesStore()
     const starred = useStarredStore()
     starred.entries = [
-      { name: 'c.jpg', path: '/Photos/c.jpg', pinned: true },
-      { name: 'd.jpg', path: '/Photos/d.jpg', pinned: true },
+      { name: 'c.jpg', path: '/Photos/c.jpg', source: 'share', pinned: true },
+      { name: 'd.jpg', path: '/Photos/d.jpg', source: 'share', pinned: true },
     ]
-    await store.toggleStar({ name: 'c.jpg', path: '/Photos/c.jpg', pinned: true })
-    expect(starred.entries).toEqual([{ name: 'd.jpg', path: '/Photos/d.jpg', pinned: true }])
+    await store.toggleStar({ name: 'c.jpg', path: '/Photos/c.jpg', source: 'share', pinned: true })
+    expect(starred.entries).toEqual([{ name: 'd.jpg', path: '/Photos/d.jpg', source: 'share', pinned: true }])
+  })
+
+  it('toggleStar removes only the matching-source entry when two drives share the same relative path', async () => {
+    pinned.togglePinned.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    const starred = useStarredStore()
+    starred.entries = [
+      { name: 'c.jpg', path: '/Photos/c.jpg', source: 'share', pinned: true },
+      { name: 'c.jpg', path: '/Photos/c.jpg', source: 'home', pinned: true },
+    ]
+    await store.toggleStar({ name: 'c.jpg', path: '/Photos/c.jpg', source: 'home', pinned: true })
+    expect(starred.entries).toEqual([{ name: 'c.jpg', path: '/Photos/c.jpg', source: 'share', pinned: true }])
   })
 
   it('toggleStar does not touch the starred store\'s list when pinning a browse-view entry', async () => {

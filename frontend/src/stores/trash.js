@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { listTrash, restoreFromTrash, deleteForever, emptyTrash } from '../api/trash.js'
+import { SOURCES } from '../api/resources.js'
 import { useAuthStore } from './auth.js'
 import { canDeleteEntry } from '../permissions.js'
+
+function reachableSources() {
+  const auth = useAuthStore()
+  return auth.hasHomeDrive ? SOURCES : ['share']
+}
 
 export const useTrashStore = defineStore('trash', {
   state: () => ({ entries: [], loading: false, error: null }),
@@ -10,7 +16,12 @@ export const useTrashStore = defineStore('trash', {
       this.loading = true
       this.error = null
       try {
-        this.entries = await listTrash()
+        const results = await Promise.allSettled(reachableSources().map((source) => listTrash(source)))
+        const allFailed = results.every((r) => r.status === 'rejected')
+        if (allFailed) {
+          throw results[0].reason
+        }
+        this.entries = results.filter((r) => r.status === 'fulfilled').flatMap((r) => r.value)
       } catch (err) {
         this.error = err
         throw err
@@ -28,8 +39,17 @@ export const useTrashStore = defineStore('trash', {
     },
     async emptyAll() {
       const auth = useAuthStore()
-      await emptyTrash((item) => canDeleteEntry(item, auth.user))
+      const canDelete = (item) => canDeleteEntry(item, auth.user)
+      const failed = []
+      for (const source of reachableSources()) {
+        try {
+          await emptyTrash(source, canDelete)
+        } catch (err) {
+          failed.push(err)
+        }
+      }
       await this.loadTrash()
+      if (failed.length) throw failed[0]
     },
   },
 })

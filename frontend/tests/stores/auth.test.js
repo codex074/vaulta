@@ -84,4 +84,44 @@ describe('auth store', () => {
     expect(profilesApi.updateMyDisplayName).toHaveBeenCalledWith('New Name')
     expect(store.user).toMatchObject({ id: 2, uid: '2', username: 'codex', displayName: 'New Name' })
   })
+
+  describe('isAdmin', () => {
+    it('is true when the user has the admin permission', () => {
+      const store = useAuthStore()
+      store.user = { uid: '2', permissions: { admin: true } }
+      expect(store.isAdmin).toBe(true)
+    })
+
+    it('is false for a non-admin user', () => {
+      const store = useAuthStore()
+      store.user = { uid: '2', permissions: { admin: false } }
+      expect(store.isAdmin).toBe(false)
+    })
+
+    it('is false when there is no signed-in user', () => {
+      const store = useAuthStore()
+      expect(store.isAdmin).toBe(false)
+    })
+  })
+
+  describe('hasHomeDrive', () => {
+    it('is true when the user\'s scopes include a home entry', () => {
+      const store = useAuthStore()
+      store.user = { uid: '2', scopes: [{ name: 'share', scope: '/' }, { name: 'home', scope: '/codex' }] }
+      expect(store.hasHomeDrive).toBe(true)
+    })
+
+    it('is false when the user has no home scope', () => {
+      const store = useAuthStore()
+      store.user = { uid: '2', scopes: [{ name: 'share', scope: '/' }] }
+      expect(store.hasHomeDrive).toBe(false)
+    })
+
+    it('is false when there is no signed-in user or no scopes at all', () => {
+      const store = useAuthStore()
+      expect(store.hasHomeDrive).toBe(false)
+      store.user = { uid: '2' }
+      expect(store.hasHomeDrive).toBe(false)
+    })
+  })
 })

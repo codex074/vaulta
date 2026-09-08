@@ -16,6 +16,10 @@ async function loadIdentity() {
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({ user: null, checked: false }),
+  getters: {
+    isAdmin: (state) => Boolean(state.user?.permissions?.admin),
+    hasHomeDrive: (state) => Boolean(state.user?.scopes?.some((scope) => scope.name === 'home')),
+  },
   actions: {
     async checkSession() {
       try {
