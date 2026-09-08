@@ -6,11 +6,17 @@ describe('getOfficeConfig', () => {
     global.fetch = vi.fn()
   })
 
-  it('requests the document config with source=share and the given path', async () => {
+  it('requests the document config with the given source and path', async () => {
     const config = { document: { fileType: 'docx', key: 'abc', title: 'a.docx', url: 'https://...' } }
     global.fetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(config) })
-    await expect(getOfficeConfig('/Documents/a.docx')).resolves.toEqual(config)
+    await expect(getOfficeConfig('share', '/Documents/a.docx')).resolves.toEqual(config)
     expect(global.fetch.mock.calls[0][0]).toBe('/api/office/config?source=share&path=%2FDocuments%2Fa.docx')
+  })
+
+  it('requests the document config for the home source', async () => {
+    global.fetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({}) })
+    await getOfficeConfig('home', '/a.docx')
+    expect(global.fetch.mock.calls[0][0]).toBe('/api/office/config?source=home&path=%2Fa.docx')
   })
 
   it('throws with the server message when the request fails', async () => {
@@ -19,6 +25,6 @@ describe('getOfficeConfig', () => {
       clone() { return this },
       json: () => Promise.resolve({ message: 'only-office integration must be configured in settings' }),
     })
-    await expect(getOfficeConfig('/a.docx')).rejects.toThrow('only-office integration must be configured in settings')
+    await expect(getOfficeConfig('share', '/a.docx')).rejects.toThrow('only-office integration must be configured in settings')
   })
 })

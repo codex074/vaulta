@@ -44,12 +44,17 @@ function basename(path) {
   return idx === -1 ? path : path.slice(idx + 1)
 }
 
-export async function moveInto(draggedPaths, targetPath) {
+// TODO(D6): flip to moveInto(source, draggedPaths, targetPath) with source
+// required (no default) once every call site threads its own entry.source
+// through, per the private-drives-quota plan's D6 task. Defaulting to
+// 'share' here for now keeps this file's own behavior (and its tests)
+// unchanged until that call-site rewiring lands.
+export async function moveInto(draggedPaths, targetPath, source = 'share') {
   const base = targetPath === '/' ? '' : targetPath
   const failed = []
   for (const path of draggedPaths) {
     try {
-      await moveItem(path, `${base}/${basename(path)}`)
+      await moveItem(source, path, `${base}/${basename(path)}`)
     } catch (err) {
       failed.push({ path, message: err.message })
     }
