@@ -29,12 +29,30 @@ type configResponse struct {
 	OnlyOfficeURL string `json:"onlyOfficeUrl"`
 }
 
+type userScope struct {
+	Name  string `json:"name"`
+	Scope string `json:"scope"`
+}
+
 type fileBrowserUser struct {
 	ID          int    `json:"id"`
 	Username    string `json:"username"`
 	Permissions struct {
 		Admin bool `json:"admin"`
 	} `json:"permissions"`
+	Scopes []userScope `json:"scopes"`
+}
+
+// scopeFor returns the user's scope value for a given FileBrowser source
+// (e.g. "share" or "home"), and whether the user has any scope for it at
+// all. A user with no scope for a source cannot reach it through FBQ.
+func (u fileBrowserUser) scopeFor(source string) (string, bool) {
+	for _, scope := range u.Scopes {
+		if scope.Name == source {
+			return scope.Scope, true
+		}
+	}
+	return "", false
 }
 
 type profile struct {
@@ -323,34 +341,61 @@ func (s *ownershipStore) saveLocked() error {
 	return nil
 }
 
+// apiServerConfig replaces newAPIServer's earlier, ever-growing positional
+// argument list. QuotaPath/HomePath/ProxyTransport exist ahead of the quota
+// store and reverse-proxy gate that consume them (added in later tasks) so
+// every call site only has to change signature shape once.
+type apiServerConfig struct {
+	StatPath, SharePath, HomePath         string
+	ProfilePath, OwnershipPath, QuotaPath string
+	FileBrowserURL, OnlyOfficeURL         string
+	Client                                *http.Client      // identity lookups, 5s timeout
+	ProxyTransport                        http.RoundTripper // uploads; no timeout
+}
+
 type apiServer struct {
 	statPath       string
+	sharePath      string
+	homePath       string
+	quotaPath      string
 	fileBrowserURL string
 	client         *http.Client
+	proxyTransport http.RoundTripper
 	profiles       *profileStore
 	ownerships     *ownershipStore
 	onlyOfficeURL  string
 }
 
-func newAPIServer(statPath, profilePath, ownershipPath, fileBrowserURL, onlyOfficeURL string, client *http.Client) (*apiServer, error) {
-	store, err := newProfileStore(profilePath)
+func newAPIServer(cfg apiServerConfig) (*apiServer, error) {
+	profiles, err := newProfileStore(cfg.ProfilePath)
 	if err != nil {
 		return nil, err
 	}
-	ownerships, err := newOwnershipStore(ownershipPath)
+	ownerships, err := newOwnershipStore(cfg.OwnershipPath)
 	if err != nil {
 		return nil, err
 	}
+	// The quota store itself lands in a later task; for now, fail fast if
+	// its directory cannot be prepared, so a malformed QuotaPath surfaces
+	// here rather than silently later.
+	if err := os.MkdirAll(filepath.Dir(cfg.QuotaPath), 0o750); err != nil {
+		return nil, fmt.Errorf("prepare quota directory: %w", err)
+	}
+	client := cfg.Client
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Second}
 	}
 	return &apiServer{
-		statPath:       statPath,
-		fileBrowserURL: strings.TrimRight(fileBrowserURL, "/"),
+		statPath:       cfg.StatPath,
+		sharePath:      cfg.SharePath,
+		homePath:       cfg.HomePath,
+		quotaPath:      cfg.QuotaPath,
+		fileBrowserURL: strings.TrimRight(cfg.FileBrowserURL, "/"),
 		client:         client,
-		profiles:       store,
+		proxyTransport: cfg.ProxyTransport,
+		profiles:       profiles,
 		ownerships:     ownerships,
-		onlyOfficeURL:  onlyOfficeURL,
+		onlyOfficeURL:  cfg.OnlyOfficeURL,
 	}, nil
 }
 
@@ -707,18 +752,29 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func main() {
 	statPath := envOrDefault("NASAPI_STAT_PATH", "/srv/share")
+	sharePath := envOrDefault("NASAPI_SHARE_PATH", "/srv/share")
+	homePath := envOrDefault("NASAPI_HOME_PATH", "/srv/home")
 	dataPath := envOrDefault("NASAPI_DATA_PATH", "/var/lib/vaulta")
 	fileBrowserURL := envOrDefault("NASAPI_FILEBROWSER_URL", "http://127.0.0.1:30334")
 	onlyOfficeURL := envOrDefault("NASAPI_ONLYOFFICE_URL", "")
 	port := envOrDefault("NASAPI_PORT", "9190")
 
-	server, err := newAPIServer(statPath, filepath.Join(dataPath, "profiles.json"), filepath.Join(dataPath, "ownership.json"), fileBrowserURL, onlyOfficeURL, nil)
+	server, err := newAPIServer(apiServerConfig{
+		StatPath:       statPath,
+		SharePath:      sharePath,
+		HomePath:       homePath,
+		ProfilePath:    filepath.Join(dataPath, "profiles.json"),
+		OwnershipPath:  filepath.Join(dataPath, "ownership.json"),
+		QuotaPath:      filepath.Join(dataPath, "quotas.json"),
+		FileBrowserURL: fileBrowserURL,
+		OnlyOfficeURL:  onlyOfficeURL,
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	addr := "127.0.0.1:" + port
-	log.Printf("nasapi listening on %s, stat path %s, profile path %s", addr, statPath, dataPath)
+	log.Printf("nasapi listening on %s, stat path %s, share path %s, home path %s, profile path %s", addr, statPath, sharePath, homePath, dataPath)
 	log.Fatal(http.ListenAndServe(addr, server.handler()))
 }
 
