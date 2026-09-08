@@ -25,6 +25,13 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // Without this, the service worker's SPA navigation fallback
+        // intercepts *any* top-level/frame navigation — including the PDF
+        // preview's <iframe src="/api/resources/download?...">  — and
+        // serves the cached index.html instead of letting the real request
+        // reach the backend, so the "PDF viewer" silently shows the app
+        // shell again instead of the document.
+        navigateFallbackDenylist: [/^\/api\//, /^\/nasapi\//],
       },
     }),
   ],
