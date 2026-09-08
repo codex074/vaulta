@@ -14,7 +14,11 @@ export async function getOnlyOfficeUrl() {
       return cachedUrl
     }
     const payload = await response.json()
-    cachedUrl = payload.onlyOfficeUrl || ''
+    const url = payload.onlyOfficeUrl || ''
+    // documentServerUrl ends up as a <script src> origin (Lightbox.vue) — a
+    // malformed value should read as "not configured", not an opaque
+    // script-load/CSP failure.
+    cachedUrl = /^https?:\/\//.test(url) ? url : ''
   } catch {
     cachedUrl = ''
   }

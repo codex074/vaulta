@@ -29,6 +29,13 @@ describe('getOnlyOfficeUrl', () => {
     await expect(getOnlyOfficeUrl()).resolves.toBe('')
   })
 
+  it('degrades to an empty string when the configured value is not a valid http(s) URL', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true, status: 200, json: () => Promise.resolve({ onlyOfficeUrl: 'not-a-url' }),
+    })
+    await expect(getOnlyOfficeUrl()).resolves.toBe('')
+  })
+
   it('degrades to an empty string when fetch itself throws', async () => {
     global.fetch.mockRejectedValue(new Error('network down'))
     await expect(getOnlyOfficeUrl()).resolves.toBe('')
