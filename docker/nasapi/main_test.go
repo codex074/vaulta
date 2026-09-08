@@ -33,11 +33,31 @@ func newTestServerWithOwnership(t *testing.T, admin bool) (*apiServer, *httptest
 	t.Cleanup(fileBrowser.Close)
 	profilePath := filepath.Join(t.TempDir(), "profiles.json")
 	ownershipPath := filepath.Join(t.TempDir(), "ownership.json")
-	server, err := newAPIServer(t.TempDir(), profilePath, ownershipPath, fileBrowser.URL, fileBrowser.Client())
+	server, err := newAPIServer(t.TempDir(), profilePath, ownershipPath, fileBrowser.URL, "", fileBrowser.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
 	return server, fileBrowser, profilePath, ownershipPath
+}
+
+func newTestServerWithOnlyOfficeURL(t *testing.T, onlyOfficeURL string) *apiServer {
+	t.Helper()
+	fileBrowser := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, fileBrowserUser{ID: 2, Username: "login-handle"})
+	}))
+	t.Cleanup(fileBrowser.Close)
+	server, err := newAPIServer(
+		t.TempDir(),
+		filepath.Join(t.TempDir(), "profiles.json"),
+		filepath.Join(t.TempDir(), "ownership.json"),
+		fileBrowser.URL,
+		onlyOfficeURL,
+		fileBrowser.Client(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return server
 }
 
 func request(t *testing.T, handler http.Handler, method, path, body string, authenticated bool) *httptest.ResponseRecorder {
@@ -82,7 +102,7 @@ func TestProfileUpdatePersistsByUID(t *testing.T) {
 		t.Fatalf("display name = %q", got)
 	}
 
-	reloaded, err := newAPIServer(t.TempDir(), profilePath, filepath.Join(t.TempDir(), "ownership.json"), fileBrowser.URL, fileBrowser.Client())
+	reloaded, err := newAPIServer(t.TempDir(), profilePath, filepath.Join(t.TempDir(), "ownership.json"), fileBrowser.URL, "", fileBrowser.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +301,7 @@ func TestOwnershipPersistsAcrossRestart(t *testing.T) {
 	server, fileBrowser, _, ownershipPath := newTestServerWithOwnership(t, false)
 	request(t, server.handler(), http.MethodPost, "/ownership", `{"path":"/photos/a.jpg"}`, true)
 
-	reloaded, err := newAPIServer(t.TempDir(), filepath.Join(t.TempDir(), "profiles.json"), ownershipPath, fileBrowser.URL, fileBrowser.Client())
+	reloaded, err := newAPIServer(t.TempDir(), filepath.Join(t.TempDir(), "profiles.json"), ownershipPath, fileBrowser.URL, "", fileBrowser.Client())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,5 +323,35 @@ func TestNonAdminCannotListOrEditOtherProfiles(t *testing.T) {
 		if w.Code != http.StatusForbidden {
 			t.Fatalf("%s %s: status = %d", test.method, test.path, w.Code)
 		}
+	}
+}
+
+func TestConfigReturnsConfiguredOnlyOfficeURL(t *testing.T) {
+	server := newTestServerWithOnlyOfficeURL(t, "https://office.codex074.com")
+	w := request(t, server.handler(), http.MethodGet, "/config", "", false)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if w.Body.String() != `{"onlyOfficeUrl":"https://office.codex074.com"}`+"\n" {
+		t.Fatalf("body = %s", w.Body.String())
+	}
+}
+
+func TestConfigReturnsEmptyOnlyOfficeURLWhenUnset(t *testing.T) {
+	server := newTestServerWithOnlyOfficeURL(t, "")
+	w := request(t, server.handler(), http.MethodGet, "/config", "", false)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if w.Body.String() != `{"onlyOfficeUrl":""}`+"\n" {
+		t.Fatalf("body = %s", w.Body.String())
+	}
+}
+
+func TestConfigRejectsNonGet(t *testing.T) {
+	server := newTestServerWithOnlyOfficeURL(t, "https://office.codex074.com")
+	w := request(t, server.handler(), http.MethodPost, "/config", "", false)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", w.Code)
 	}
 }

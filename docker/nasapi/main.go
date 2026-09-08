@@ -25,6 +25,10 @@ type storageResponse struct {
 	TotalBytes uint64 `json:"totalBytes"`
 }
 
+type configResponse struct {
+	OnlyOfficeURL string `json:"onlyOfficeUrl"`
+}
+
 type fileBrowserUser struct {
 	ID          int    `json:"id"`
 	Username    string `json:"username"`
@@ -325,9 +329,10 @@ type apiServer struct {
 	client         *http.Client
 	profiles       *profileStore
 	ownerships     *ownershipStore
+	onlyOfficeURL  string
 }
 
-func newAPIServer(statPath, profilePath, ownershipPath, fileBrowserURL string, client *http.Client) (*apiServer, error) {
+func newAPIServer(statPath, profilePath, ownershipPath, fileBrowserURL, onlyOfficeURL string, client *http.Client) (*apiServer, error) {
 	store, err := newProfileStore(profilePath)
 	if err != nil {
 		return nil, err
@@ -345,12 +350,14 @@ func newAPIServer(statPath, profilePath, ownershipPath, fileBrowserURL string, c
 		client:         client,
 		profiles:       store,
 		ownerships:     ownerships,
+		onlyOfficeURL:  onlyOfficeURL,
 	}, nil
 }
 
 func (s *apiServer) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/storage", s.handleStorage)
+	mux.HandleFunc("/config", s.handleConfig)
 	mux.HandleFunc("/profile", s.handleMyProfile)
 	mux.HandleFunc("/profiles", s.handleProfiles)
 	mux.HandleFunc("/profiles/", s.handleProfileByUID)
@@ -373,6 +380,14 @@ func (s *apiServer) handleStorage(w http.ResponseWriter, r *http.Request) {
 	total := stat.Blocks * uint64(stat.Bsize)
 	free := stat.Bavail * uint64(stat.Bsize)
 	writeJSON(w, http.StatusOK, storageResponse{UsedBytes: total - free, TotalBytes: total})
+}
+
+func (s *apiServer) handleConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	writeJSON(w, http.StatusOK, configResponse{OnlyOfficeURL: s.onlyOfficeURL})
 }
 
 func (s *apiServer) handleMyProfile(w http.ResponseWriter, r *http.Request) {
@@ -694,9 +709,10 @@ func main() {
 	statPath := envOrDefault("NASAPI_STAT_PATH", "/srv/share")
 	dataPath := envOrDefault("NASAPI_DATA_PATH", "/var/lib/vaulta")
 	fileBrowserURL := envOrDefault("NASAPI_FILEBROWSER_URL", "http://127.0.0.1:30334")
+	onlyOfficeURL := envOrDefault("NASAPI_ONLYOFFICE_URL", "")
 	port := envOrDefault("NASAPI_PORT", "9190")
 
-	server, err := newAPIServer(statPath, filepath.Join(dataPath, "profiles.json"), filepath.Join(dataPath, "ownership.json"), fileBrowserURL, nil)
+	server, err := newAPIServer(statPath, filepath.Join(dataPath, "profiles.json"), filepath.Join(dataPath, "ownership.json"), fileBrowserURL, onlyOfficeURL, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
