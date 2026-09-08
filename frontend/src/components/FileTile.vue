@@ -104,6 +104,7 @@ async function onStarClick() {
     <div class="thumb" @click="onClick">
       <img v-if="showThumb" :src="thumbSrc" :alt="entry.name" loading="lazy" @error="thumbFailed = true" />
       <template v-else>{{ iconFor(entry) }}</template>
+      <span v-if="showThumb && entry.type === 'directory'" class="folder-badge">📁</span>
     </div>
     <div class="name" :title="entry.name">{{ entry.displayName ?? entry.name }}</div>
     <div class="meta">
@@ -127,8 +128,16 @@ async function onStarClick() {
 .tile.selected { border-color: var(--accent); background: var(--selected-bg); }
 .tile.dragging { opacity: 0.5; }
 .tile.drop-target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-.thumb { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; overflow: hidden; }
+.thumb { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.folder-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 15px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
 .name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .meta { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); }
 .dots { position: absolute; top: 6px; right: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 14px; }

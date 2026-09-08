@@ -121,14 +121,16 @@ async function onDrop(event, entry) {
           </button>
         </td>
         <td class="name-col" @click="onClick(entry)">
-          <img
-            v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))"
-            class="row-thumb"
-            :src="previewUrl(fullPath(entry), 'small')"
-            :alt="entry.name"
-            loading="lazy"
-            @error="failedThumbs.add(fullPath(entry))"
-          />
+          <span v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))" class="row-thumb-wrap">
+            <img
+              class="row-thumb"
+              :src="previewUrl(fullPath(entry), 'small')"
+              :alt="entry.name"
+              loading="lazy"
+              @error="failedThumbs.add(fullPath(entry))"
+            />
+            <span v-if="entry.type === 'directory'" class="row-folder-badge">📁</span>
+          </span>
           <span v-else class="row-icon">{{ iconFor(entry) }}</span>
           {{ entry.displayName ?? entry.name }}
         </td>
@@ -148,7 +150,9 @@ async function onDrop(event, entry) {
 .list td:nth-child(3) { cursor: pointer; }
 .list tr.dragging { opacity: 0.5; }
 .list tr.drop-target td { box-shadow: inset 0 0 0 2px var(--accent); }
-.row-thumb { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
+.row-thumb-wrap { position: relative; display: inline-block; vertical-align: middle; margin-right: 4px; }
+.row-thumb { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; display: block; }
+.row-folder-badge { position: absolute; bottom: -3px; right: -3px; font-size: 9px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
 .row-icon { display: inline-block; width: 20px; text-align: center; margin-right: 4px; }
 .list button { border: none; background: none; color: var(--text-muted); }
 .select-col, .star-col { width: 32px; }
