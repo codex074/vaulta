@@ -38,7 +38,7 @@ function statusText(u) {
 </template>
 
 <style scoped>
-.tray { position: fixed; bottom: 16px; right: 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; width: 300px; max-height: 50vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 20; }
+.tray { position: fixed; bottom: 16px; right: 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; width: 300px; max-height: 50vh; max-height: 50dvh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 20; }
 .tray-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
 .link-button { border: none; background: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
 .row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0; }

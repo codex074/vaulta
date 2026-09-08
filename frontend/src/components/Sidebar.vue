@@ -140,6 +140,22 @@ onUnmounted(() => {
           </div>
           <span v-if="auth.user?.permissions?.admin" class="admin-badge">Admin</span>
         </div>
+        <div v-if="showQuota" class="storage account-storage">
+          <div class="storage-header">
+            <span class="storage-icon"><UiIcon name="storage" :size="16" /></span>
+            <span>My Drive</span>
+          </div>
+          <div v-if="quota.limitBytes" class="storage-bar"><div class="storage-fill" :style="{ width: quotaPct + '%', background: quotaColor }"></div></div>
+          <div class="storage-label">{{ quotaText }}</div>
+        </div>
+        <div v-else-if="!storageError" class="storage account-storage">
+          <div class="storage-header">
+            <span class="storage-icon"><UiIcon name="storage" :size="16" /></span>
+            <span>Storage</span>
+          </div>
+          <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%', background: fillColor }"></div></div>
+          <div class="storage-label">{{ formatSize(usedBytes) }} of {{ formatSize(totalBytes) }} used</div>
+        </div>
         <button @click="openAccountSettings">Account settings</button>
         <button v-if="auth.user?.permissions?.admin" @click="openManageUsers">Manage users</button>
         <button class="danger" @click="auth.signOut()">Sign out</button>

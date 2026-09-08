@@ -350,7 +350,7 @@ async function enableMyDriveAccess() {
 
 <style scoped>
 .backdrop { position: fixed; inset: 0; background: rgba(20, 25, 35, 0.4); display: flex; align-items: center; justify-content: center; z-index: 20; }
-.dialog { background: var(--bg-elevated); border-radius: var(--radius); padding: 24px; width: 420px; max-height: 80vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.dialog { background: var(--bg-elevated); border-radius: var(--radius); padding: 24px; width: 420px; max-width: 100%; max-height: 80vh; max-height: 80dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 .dialog h3 { margin: 0; }
 .dialog h4 { margin: 0 0 6px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
@@ -380,4 +380,17 @@ async function enableMyDriveAccess() {
 }
 .actions button, .section > button { padding: 8px 14px; font-size: 13px; }
 button:disabled { cursor: not-allowed; opacity: 0.6; }
+
+@media (max-width: 560px) {
+  .backdrop { align-items: flex-end; padding: 0; }
+  .dialog {
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    max-height: 92dvh;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .user-list button.danger, .actions button, .section > button,
+  .user-list li > button:not(.link-button) { min-height: 40px; }
+}
 </style>

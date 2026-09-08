@@ -148,11 +148,16 @@ function onOfficeLoadError() {
 
 <style scoped>
 .backdrop { position: fixed; inset: 0; background: rgba(15, 18, 25, 0.75); display: flex; align-items: center; justify-content: center; z-index: 30; }
-.frame { position: relative; max-width: 85vw; max-height: 85vh; background: var(--bg-elevated); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; justify-content: center; }
-.frame img { max-width: 100%; max-height: 75vh; }
-.frame :deep(.plyr) { max-width: 80vw; max-height: 75vh; }
-.frame :deep(.plyr__video-wrapper) { max-height: 75vh; }
-.frame :deep(video) { max-height: 75vh; }
+.frame { position: relative; max-width: 85vw; max-height: 85vh; max-height: 85dvh; background: var(--bg-elevated); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; justify-content: center; }
+.frame img { max-width: 100%; max-height: 75vh; max-height: 75dvh; }
+.frame :deep(.plyr) { max-width: 80vw; max-height: 75vh; max-height: 75dvh; }
+.frame :deep(.plyr__video-wrapper) { max-height: 75vh; max-height: 75dvh; }
+.frame :deep(video) { max-height: 75vh; max-height: 75dvh; }
+
+@media (max-width: 640px) {
+  .frame { max-width: 94vw; padding: 12px; }
+  .frame img { max-height: 70dvh; }
+}
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
 .fallback { text-align: center; }
 
