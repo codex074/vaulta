@@ -46,6 +46,9 @@ defineProps({ name: { type: String, required: true }, size: { type: Number, defa
     <g v-else-if="name === 'chevron'">
       <path d="m7.2 4.8 5.1 5.2-5.1 5.2" />
     </g>
+    <g v-else-if="name === 'arrow-left'">
+      <path d="M15.5 10H4.5M9 4.5 3.5 10 9 15.5" />
+    </g>
     <g v-else-if="name === 'sun'">
       <circle cx="10" cy="10" r="3.2" />
       <path d="M10 2.4v1.5M10 16.1v1.5M2.4 10h1.5M16.1 10h1.5M4.6 4.6l1.1 1.1M14.3 14.3l1.1 1.1M15.4 4.6l-1.1 1.1M5.7 14.3l-1.1 1.1" />
