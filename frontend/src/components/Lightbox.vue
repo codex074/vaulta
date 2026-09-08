@@ -83,6 +83,8 @@ async function loadOffice(path, name) {
       ...config,
       documentType,
       type: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+      width: '100%',
+      height: '100%',
     }
   } catch {
     officeFailed.value = true
@@ -109,13 +111,14 @@ function onOfficeLoadError() {
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
       <iframe v-else-if="kind === 'pdf'" :src="pdfSrc" title="PDF preview" />
-      <DocumentEditor
-        v-else-if="kind === 'office' && officeConfig && !officeFailed"
-        id="vaulta-office-editor"
-        :document-server-url="officeUrl"
-        :config="officeConfig"
-        :on-load-component-error="onOfficeLoadError"
-      />
+      <div v-else-if="kind === 'office' && officeConfig && !officeFailed" class="office-frame">
+        <DocumentEditor
+          id="vaulta-office-editor"
+          :document-server-url="officeUrl"
+          :config="officeConfig"
+          :on-load-component-error="onOfficeLoadError"
+        />
+      </div>
       <div v-else class="fallback">
         <p>{{ entry.name }}</p>
         <a :href="src" target="_blank">Download</a>
@@ -132,7 +135,9 @@ function onOfficeLoadError() {
 .frame :deep(.plyr__video-wrapper) { max-height: 75vh; }
 .frame :deep(video) { max-height: 75vh; }
 .frame iframe { width: 70vw; height: 80vh; border: none; }
-.frame :deep(#vaulta-office-editor) { width: 80vw; height: 85vh; }
+.office-frame { width: 80vw; height: 85vh; }
+.office-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
+.office-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
 .fallback { text-align: center; }
 </style>
