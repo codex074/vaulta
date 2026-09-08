@@ -1,7 +1,9 @@
 <script setup>
+import FileGlyph from './FileGlyph.vue'
+import UiIcon from './UiIcon.vue'
 import { computed, ref, reactive } from 'vue'
 import { useFilesStore } from '../stores/files.js'
-import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
+import { formatSize, formatRelativeTime } from './fileFormat.js'
 import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
@@ -13,7 +15,7 @@ const props = defineProps({
   entries: { type: Array, required: true },
   disableOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['open', 'menu', 'changed'])
+const emit = defineEmits(['open', 'menu', 'changed', 'folder-opened'])
 const files = useFilesStore()
 const draggingPath = ref(null)
 const dropTargetPath = ref(null)
@@ -43,6 +45,7 @@ async function onClick(entry) {
       // resolve against the right source.
       if (entry.source && entry.source !== files.source) files.source = entry.source
       await files.loadDirectory(fullPath(entry))
+      emit('folder-opened')
     } catch (err) {
       showError(err.message || 'Could not open folder.')
     }
@@ -110,9 +113,9 @@ async function onDrop(event, entry) {
     <thead>
       <tr>
         <th class="select-col">
-          <input type="checkbox" :checked="allSelected" @click="onToggleSelectAll" />
+          <input type="checkbox" aria-label="Select all files" :checked="allSelected" @click="onToggleSelectAll" />
         </th>
-        <th></th>
+        <th class="star-col"></th>
         <th>Name</th>
         <th>Size</th>
         <th>Modified</th>
@@ -133,18 +136,22 @@ async function onDrop(event, entry) {
         @drop="onDrop($event, entry)"
       >
         <td class="select-col">
+          <label class="row-select">
           <input
             type="checkbox"
+            :aria-label="`Select ${entry.name}`"
             :checked="files.selected.has(selKey(entry))"
             @click.stop="files.toggleSelect(selKey(entry))"
           />
+          </label>
         </td>
         <td class="star-col">
-          <button v-if="!disableOpen" class="star" @click.stop="onStarClick(entry)">
-            {{ entry.pinned ?? files.pinnedNames.has(entry.name) ? '⭐' : '☆' }}
+          <button v-if="!disableOpen" class="star" :aria-label="`Toggle star for ${entry.name}`" :class="{ starred: entry.pinned ?? files.pinnedNames.has(entry.name) }" @click.stop="onStarClick(entry)">
+            <UiIcon name="starred" :size="18" />
           </button>
         </td>
-        <td class="name-col" @click="onClick(entry)">
+        <td class="name-col">
+          <button class="file-open" :aria-label="`Open ${entry.name}`" :disabled="disableOpen" @click="onClick(entry)">
           <span v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))" class="row-thumb-wrap">
             <img
               class="row-thumb"
@@ -153,15 +160,16 @@ async function onDrop(event, entry) {
               loading="lazy"
               @error="failedThumbs.add(fullPath(entry))"
             />
-            <span v-if="entry.type === 'directory'" class="row-folder-badge">📁</span>
+            <span v-if="entry.type === 'directory'" class="row-folder-badge"><UiIcon name="folder" :size="12" /></span>
           </span>
-          <span v-else class="row-icon">{{ iconFor(entry) }}</span>
-          {{ entry.displayName ?? entry.name }}
+          <FileGlyph v-else class="row-glyph" :entry="entry" />
+          <span class="file-row-copy"><span class="file-row-name">{{ entry.displayName ?? entry.name }}</span><span class="file-row-detail">{{ entry.type === 'directory' ? 'Folder' : formatSize(entry.size) }} · {{ formatRelativeTime(entry.deletedAt || entry.modified) }}</span></span>
+          </button>
         </td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
         <td>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</td>
         <td class="uploader-col">{{ entry.uploadedByUsername || '—' }}</td>
-        <td><button @click.stop="emit('menu', { entry: { ...entry, source: entrySource(entry) }, path: fullPath(entry) })">⋮</button></td>
+        <td class="actions-col"><button :aria-label="`Actions for ${entry.name}`" @click.stop="emit('menu', { entry: { ...entry, source: entrySource(entry) }, path: fullPath(entry) })"><UiIcon name="more" /></button></td>
       </tr>
     </tbody>
   </table>

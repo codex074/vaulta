@@ -1,4 +1,5 @@
 <script setup>
+import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import { listUsers, createUser, deleteUser, isValidUsername, updateUserScopes } from '../api/users.js'
@@ -254,7 +255,7 @@ async function enableMyDriveAccess() {
 
 <template>
   <div class="backdrop" @click.self="emit('close')">
-    <div class="dialog">
+    <div role="dialog" aria-modal="true" aria-label="Manage users" class="dialog" v-dialog-focus="() => emit('close')">
       <h3>Manage users</h3>
 
       <label class="field">

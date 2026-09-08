@@ -8,6 +8,7 @@ import { formatSize } from './fileFormat.js'
 import { quotaPercent, quotaFillColor, quotaLabel } from './quotaMath.js'
 import AccountSettingsDialog from './AccountSettingsDialog.vue'
 import ManageUsersDialog from './ManageUsersDialog.vue'
+import ThemeToggle from './ThemeToggle.vue'
 import VaultaBrand from './VaultaBrand.vue'
 import UiIcon from './UiIcon.vue'
 
@@ -80,10 +81,11 @@ onUnmounted(() => {
 <template>
   <nav class="sidebar" aria-label="Primary navigation">
     <VaultaBrand class="sidebar-brand" />
-    <p class="nav-label">Workspace</p>
+    <p class="nav-label">Locations</p>
     <button
       class="sidebar-item"
       :class="{ active: view === 'browse' && files.source === 'home' }"
+      :aria-current="view === 'browse' && files.source === 'home' ? 'page' : undefined"
       :disabled="!auth.hasHomeDrive"
       :title="auth.hasHomeDrive ? '' : 'Ask an admin to assign you a private drive'"
       @click="emit('navigate', 'home')"
@@ -91,21 +93,21 @@ onUnmounted(() => {
       <span class="sidebar-icon"><UiIcon name="home" /></span>
       <span class="sidebar-label">My Drive</span>
     </button>
-    <button class="sidebar-item" :class="{ active: view === 'browse' && files.source === 'share' }" @click="emit('navigate', 'share')">
+    <button class="sidebar-item" :class="{ active: view === 'browse' && files.source === 'share' }" :aria-current="view === 'browse' && files.source === 'share' ? 'page' : undefined" @click="emit('navigate', 'share')">
       <span class="sidebar-icon"><UiIcon name="storage" /></span>
       <span class="sidebar-label">Shared</span>
     </button>
-    <button class="sidebar-item" :class="{ active: view === 'starred' }" @click="emit('navigate', 'starred')">
+    <button class="sidebar-item" :class="{ active: view === 'starred' }" :aria-current="view === 'starred' ? 'page' : undefined" @click="emit('navigate', 'starred')">
       <span class="sidebar-icon"><UiIcon name="starred" /></span>
       <span class="sidebar-label">Starred</span>
     </button>
-    <button class="sidebar-item" :class="{ active: view === 'trash' }" @click="emit('navigate', 'trash')">
+    <button class="sidebar-item" :class="{ active: view === 'trash' }" :aria-current="view === 'trash' ? 'page' : undefined" @click="emit('navigate', 'trash')">
       <span class="sidebar-icon"><UiIcon name="trash" /></span>
       <span class="sidebar-label">Trash</span>
     </button>
     <button class="sidebar-item upload-item" @click="emit('upload')">
       <span class="sidebar-icon"><UiIcon name="upload" /></span>
-      <span class="sidebar-label">Bring files in</span>
+      <span class="sidebar-label">Upload files</span>
       <UiIcon class="upload-arrow" name="chevron" :size="15" />
     </button>
     <div class="sidebar-spacer"></div>
@@ -126,13 +128,14 @@ onUnmounted(() => {
       <div class="storage-label">{{ formatSize(usedBytes) }} of {{ formatSize(totalBytes) }} used</div>
     </div>
     <div class="account-wrapper">
-      <button class="sidebar-item" :class="{ active: showAccountMenu }" @click="showAccountMenu = !showAccountMenu">
+      <button class="sidebar-item" aria-label="Account" :aria-expanded="showAccountMenu" :class="{ active: showAccountMenu }" @click="showAccountMenu = !showAccountMenu">
         <span class="account-avatar">{{ accountInitial }}</span>
-        <span class="sidebar-label">{{ auth.user?.displayName || auth.user?.username || 'Account' }}</span>
+        <span class="mobile-account-label">Account</span>
+        <span class="sidebar-label account-name">{{ auth.user?.displayName || auth.user?.username || 'Account' }}</span>
         <UiIcon class="account-arrow" name="chevron" :size="14" />
       </button>
       <div v-if="showAccountMenu" class="account-backdrop" @click="showAccountMenu = false"></div>
-      <div v-if="showAccountMenu" class="account-menu">
+      <div v-if="showAccountMenu" class="account-menu" @keydown.esc="showAccountMenu = false">
         <div class="account-menu-header">
           <div class="account-identity">
             <strong>{{ auth.user?.displayName || auth.user?.username }}</strong>
@@ -156,6 +159,7 @@ onUnmounted(() => {
           <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%', background: fillColor }"></div></div>
           <div class="storage-label">{{ formatSize(usedBytes) }} of {{ formatSize(totalBytes) }} used</div>
         </div>
+        <div class="appearance-row"><span>Appearance</span><ThemeToggle /></div>
         <button @click="openAccountSettings">Account settings</button>
         <button v-if="auth.user?.permissions?.admin" @click="openManageUsers">Manage users</button>
         <button class="danger" @click="auth.signOut()">Sign out</button>

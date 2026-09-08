@@ -1,4 +1,5 @@
 <script setup>
+import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -77,7 +78,7 @@ async function savePassword() {
 
 <template>
   <div class="backdrop" @click.self="emit('close')">
-    <section class="dialog account-settings" role="dialog" aria-modal="true" aria-labelledby="account-settings-title">
+    <section class="dialog account-settings" v-dialog-focus="() => emit('close')" role="dialog" aria-modal="true" aria-labelledby="account-settings-title">
       <header class="dialog-header">
         <div>
           <h3 id="account-settings-title">Account settings</h3>

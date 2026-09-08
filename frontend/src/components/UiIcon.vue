@@ -4,13 +4,14 @@ defineProps({ name: { type: String, required: true }, size: { type: Number, defa
 
 <template>
   <svg class="ui-icon" :width="size" :height="size" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-    <g v-if="name === 'home'">
+    <g v-if="name === 'more'"><circle cx="4" cy="10" r="1" class="icon-fill" /><circle cx="10" cy="10" r="1" class="icon-fill" /><circle cx="16" cy="10" r="1" class="icon-fill" /></g>
+    <g v-else-if="name === 'folder'"><path d="M2 5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2Z" /></g>
+    <g v-else-if="name === 'home'">
       <path d="M3.1 5.4 10 2.7l6.9 2.7v9.2L10 17.3l-6.9-2.7V5.4Z" />
       <path d="M6.2 8.1h7.6M6.2 11.1h7.6M8 14h4" />
     </g>
     <g v-else-if="name === 'starred'">
-      <path d="m10 2.6 1.55 4.3 4.25 1.55-4.25 1.55L10 14.3 8.45 10 4.2 8.45 8.45 6.9 10 2.6Z" />
-      <path d="m15.4 13.1.55 1.45 1.45.55-1.45.55-.55 1.45-.55-1.45-1.45-.55 1.45-.55.55-1.45Z" />
+      <path d="m10 2 2.45 5 5.5.8-4 3.9.95 5.5-4.9-2.6-4.9 2.6.95-5.5-4-3.9L7.55 7Z" />
     </g>
     <g v-else-if="name === 'trash'">
       <path d="M5.1 6.4h9.8l-.7 10H5.8l-.7-10Z" />

@@ -1,4 +1,5 @@
 <script setup>
+import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { ref } from 'vue'
 import { makeDirectory } from '../api/resources.js'
 import { stampOwnership } from '../api/ownership.js'
@@ -42,10 +43,10 @@ async function onSubmit() {
 
 <template>
   <div class="backdrop" @click.self="emit('close')">
-    <form class="dialog" @submit.prevent="onSubmit">
+    <form class="dialog" v-dialog-focus="() => emit('close')" role="dialog" aria-modal="true" aria-label="New folder" @submit.prevent="onSubmit">
       <h3>New folder</h3>
       <p class="hint">You can type a path like <code>Photos/2026</code> to create nested folders at once.</p>
-      <input v-model="name" placeholder="Folder name" autofocus />
+      <input aria-label="Folder name" v-model="name" placeholder="Folder name" autofocus />
       <div class="actions">
         <button type="button" @click="emit('close')">Cancel</button>
         <button type="submit" :disabled="submitting">Create</button>

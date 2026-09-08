@@ -4,15 +4,18 @@ import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
 import { dragPaths, isValidDropTarget, hasDragPayload, isWithin, moveInto } from './dragMove.js'
 import { selectionKey, collapseTrail } from './pathHelpers.js'
-import ThemeToggle from './ThemeToggle.vue'
 import UiIcon from './UiIcon.vue'
 
 const props = defineProps({
   entries: { type: Array, default: () => [] },
+  view: { type: String, default: 'browse' },
+  searchQuery: { type: String, default: '' },
 })
 const emit = defineEmits(['new-folder', 'search', 'upload'])
 const files = useFilesStore()
 const dropTargetPath = ref(null)
+const heading = computed(() => props.view === 'starred' ? 'Starred' : props.view === 'trash' ? 'Trash' : files.currentPath.split('/').filter(Boolean).at(-1) || (files.source === 'home' ? 'My Drive' : 'Shared'))
+const subtitle = computed(() => props.view === 'starred' ? 'Your favorites, all together.' : props.view === 'trash' ? 'Restore files or let them go.' : files.currentPath !== '/' ? 'A little more organized.' : files.source === 'home' ? 'A home for everything that matters.' : 'Good things are better shared.')
 
 const allSelected = computed(() =>
   props.entries.length > 0 &&
@@ -90,14 +93,12 @@ async function onDrop(event, path) {
 
 <template>
   <header class="topbar">
-    <label class="select-all">
-      <input type="checkbox" :checked="allSelected" @change="onToggleSelectAll" />
-      Select all
-    </label>
-    <button class="back-btn" :disabled="atRoot" aria-label="Up one level" title="Up one level" @click="goUp">
+    <div class="navigation-row">
+    <span v-if="view !== 'browse' || atRoot" class="location-label"><UiIcon :name="view === 'starred' ? 'starred' : view === 'trash' ? 'trash' : 'home'" :size="17" />{{ view === 'browse' ? 'Your library' : 'Collections' }}</span>
+    <button v-if="view === 'browse' && !atRoot" class="back-btn" :disabled="atRoot" aria-label="Up one level" title="Up one level" @click="goUp">
       <UiIcon name="arrow-left" :size="18" />
     </button>
-    <nav class="breadcrumb">
+    <nav v-if="view === 'browse' && !atRoot" class="breadcrumb" aria-label="Folder path">
       <button
         class="crumb"
         :class="{ 'drop-target': dropTargetPath === trail.lead.path }"
@@ -128,18 +129,25 @@ async function onDrop(event, path) {
         >{{ crumb.label }}</button>
       </template>
     </nav>
-    <label class="search-wrap">
-      <UiIcon name="search" :size="17" />
-      <input class="search" placeholder="Find in this space" @input="emit('search', $event.target.value)" />
-    </label>
     <div class="toolbar-actions">
       <button class="toolbar-button" :aria-label="files.viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'" @click="files.toggleViewMode()">
         <UiIcon :name="files.viewMode === 'grid' ? 'list' : 'grid'" />
         <span>{{ files.viewMode === 'grid' ? 'List' : 'Grid' }}</span>
       </button>
-      <button class="toolbar-button" @click="emit('upload')"><UiIcon name="upload" /><span>Upload</span></button>
-      <button class="toolbar-button primary-action" @click="emit('new-folder')"><UiIcon name="folder-plus" /><span>New folder</span></button>
-      <ThemeToggle />
+      <button v-if="view === 'browse'" class="toolbar-button" aria-label="Upload files" @click="emit('upload')"><UiIcon name="upload" /><span>Upload</span></button>
+      <button v-if="view === 'browse'" class="toolbar-button primary-action" aria-label="New folder" @click="emit('new-folder')"><UiIcon name="folder-plus" /><span>New folder</span></button>
+    </div>
+    </div>
+    <div class="page-heading">
+      <div class="heading-copy"><h1 :title="heading">{{ heading }}</h1><p>{{ subtitle }}</p></div>
+      <span class="item-count">{{ entries.length }} {{ entries.length === 1 ? 'item' : 'items' }}</span>
+    </div>
+    <div class="search-row">
+      <label class="search-wrap">
+        <UiIcon name="search" :size="19" />
+        <input class="search" type="search" aria-label="Search files" placeholder="Search files" :value="searchQuery" @input="emit('search', $event.target.value)" />
+      </label>
+      <label class="select-all"><input type="checkbox" :checked="allSelected" @change="onToggleSelectAll" />Select all</label>
     </div>
   </header>
 </template>

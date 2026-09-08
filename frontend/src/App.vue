@@ -22,6 +22,7 @@ import NewFolderDialog from './components/NewFolderDialog.vue'
 import UploadToast from './components/UploadToast.vue'
 import ErrorToast from './components/ErrorToast.vue'
 import ContextMenu from './components/ContextMenu.vue'
+import UiIcon from './components/UiIcon.vue'
 import Lightbox from './components/Lightbox.vue'
 
 const auth = useAuthStore()
@@ -30,13 +31,23 @@ const starred = useStarredStore()
 const trash = useTrashStore()
 const quota = useQuotaStore()
 const theme = useThemeStore()
-watch(() => theme.current, (value) => { document.documentElement.dataset.theme = value }, { immediate: true })
+watch(() => theme.current, (value) => {
+  document.documentElement.dataset.theme = value
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value === 'dark' ? '#18181b' : '#f5f5f7')
+}, { immediate: true })
 const showNewFolder = ref(false)
 const activeMenu = ref(null)
 const previewing = ref(null)
 const uploads = reactive([])
 const searchQuery = ref('')
 const view = ref('browse')
+const mainEl = ref(null)
+watch(() => [view.value, files.source, files.currentPath], () => mainEl.value?.scrollTo?.({ top: 0 }))
+function onFolderOpened() {
+  view.value = 'browse'
+  searchQuery.value = ''
+}
+const loading = computed(() => view.value === 'starred' ? starred.loading : view.value === 'trash' ? trash.loading : files.loading)
 
 const activeEntries = computed(() => {
   const source = view.value === 'starred' ? starred.entries : view.value === 'trash' ? trash.entries : files.entries
@@ -227,9 +238,11 @@ async function onEmptyTrash() {
   <div v-else-if="auth.checked" id="app-shell">
     <input ref="fileInputEl" type="file" multiple style="display: none" @change="onFileInputChange" />
     <Sidebar :view="view" @upload="triggerFilePicker" @navigate="onNavigate" />
-    <div class="main">
+    <div ref="mainEl" class="main">
       <TopBar
         :entries="activeEntries"
+        :view="view"
+        :search-query="searchQuery"
         @new-folder="showNewFolder = true"
         @search="searchQuery = $event"
         @upload="triggerFilePicker"
@@ -249,13 +262,22 @@ async function onEmptyTrash() {
         <button @click="files.clearSelection()">Clear</button>
         <span v-if="bulkError" class="bulk-error">{{ bulkError }}</span>
       </div>
-      <div class="content" @dragover.prevent @drop="onDrop">
+      <main class="content" :aria-busy="loading" @dragover.prevent @drop="onDrop">
+        <div class="content-caption"><span>{{ searchQuery ? 'Search results' : 'All files' }}</span><span>{{ view === 'browse' ? 'Name ↑' : 'Across your drives' }}</span></div>
+        <div v-if="loading && !activeEntries.length" class="empty-state" role="status"><span class="loading-spinner"></span><h2>Opening your files…</h2></div>
+        <div v-else-if="!activeEntries.length" class="empty-state" role="status">
+          <div class="empty-symbol"><UiIcon :name="searchQuery ? 'search' : view === 'starred' ? 'starred' : view === 'trash' ? 'trash' : 'folder'" :size="42" /></div>
+          <h2>{{ searchQuery ? 'No matching files' : view === 'starred' ? 'Keep your favorites close' : view === 'trash' ? 'All clear' : 'Make yourself at home' }}</h2>
+          <p>{{ searchQuery ? 'Try a different name or a shorter search.' : view === 'starred' ? 'Star a file to find it here whenever you need it.' : view === 'trash' ? 'Deleted files will appear here.' : 'Upload your first file or create a folder to get started.' }}</p>
+          <button v-if="view === 'browse' && !searchQuery" class="empty-upload" @click="triggerFilePicker"><UiIcon name="upload" :size="18" />Upload files</button>
+        </div>
         <FileGrid
-          v-if="files.viewMode === 'grid'"
+          v-else-if="files.viewMode === 'grid'"
           :entries="activeEntries"
           :disable-open="view === 'trash'"
           @menu="activeMenu = $event"
           @open="previewing = $event"
+          @folder-opened="onFolderOpened"
           @changed="onEntryChanged"
         />
         <FileListView
@@ -264,9 +286,10 @@ async function onEmptyTrash() {
           :disable-open="view === 'trash'"
           @menu="activeMenu = $event"
           @open="previewing = $event"
+          @folder-opened="onFolderOpened"
           @changed="onEntryChanged"
         />
-      </div>
+      </main>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
     <UploadToast :uploads="uploads" @cancel="onCancelUpload" @cancel-all="onCancelAllUploads" />

@@ -135,7 +135,7 @@ function onOfficeLoadError() {
   </div>
   <div v-else class="backdrop" @click.self="$emit('close')">
     <div class="frame">
-      <button class="close" @click="$emit('close')">✕</button>
+      <button class="close" aria-label="Close preview" @click="$emit('close')">✕</button>
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
       <div v-else class="fallback">

@@ -1,4 +1,5 @@
 <script setup>
+import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { ref, computed } from 'vue'
 import { renameItem, moveItem, downloadUrl, transferItem } from '../api/resources.js'
 import { softDelete } from '../api/trash.js'
@@ -24,6 +25,9 @@ const renaming = ref(false)
 const moving = ref(false)
 const newName = ref(props.entry.name)
 const destination = ref('')
+
+const isStarred = computed(() => props.entry.pinned ?? files.pinnedNames.has(props.entry.name))
+function doStar() { return refreshAfter(() => files.toggleStar(props.entry)) }
 
 const source = computed(() => props.entry.source ?? files.source)
 const otherSource = computed(() => (source.value === 'home' ? 'share' : 'home'))
@@ -77,13 +81,14 @@ function doDeleteForever() {
 
 <template>
   <div class="backdrop" @click.self="emit('close')">
-    <div class="menu">
+    <div class="menu" v-dialog-focus="() => emit('close')" role="dialog" aria-modal="true" aria-label="File actions">
+      <div class="menu-heading"><strong>{{ entry.displayName ?? entry.name }}</strong><span>{{ source === 'home' ? 'My Drive' : 'Shared' }}</span></div>
       <template v-if="renaming">
-        <input v-model="newName" autofocus @keyup.enter="doRename" />
+        <input aria-label="New name" v-model="newName" autofocus @keyup.enter="doRename" />
         <button @click="doRename">Save</button>
       </template>
       <template v-else-if="moving">
-        <input v-model="destination" placeholder="/NewFolder/name.ext" autofocus @keyup.enter="doMove" />
+        <input aria-label="Destination path" v-model="destination" placeholder="/NewFolder/name.ext" autofocus @keyup.enter="doMove" />
         <button @click="doMove">Move</button>
       </template>
       <template v-else-if="view === 'trash'">
@@ -92,6 +97,7 @@ function doDeleteForever() {
         <span v-else class="hint">Only {{ entry.uploadedByUsername }} or an admin can delete this forever</span>
       </template>
       <template v-else>
+        <button @click="doStar">{{ isStarred ? 'Remove from Starred' : 'Add to Starred' }}</button>
         <button @click="renaming = true">Rename</button>
         <button @click="moving = true">Move</button>
         <button v-if="showCopyToOther" @click="doCopyToOther">{{ copyLabel }}</button>
@@ -99,6 +105,7 @@ function doDeleteForever() {
         <button v-if="canDelete" class="danger" @click="doDelete">Delete</button>
         <span v-else class="hint">Only {{ entry.uploadedByUsername }} or an admin can delete this</span>
       </template>
+      <button class="menu-cancel" @click="emit('close')">Done</button>
     </div>
   </div>
 </template>

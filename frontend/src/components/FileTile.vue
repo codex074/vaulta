@@ -1,7 +1,9 @@
 <script setup>
+import FileGlyph from './FileGlyph.vue'
+import UiIcon from './UiIcon.vue'
 import { computed, ref, watch } from 'vue'
 import { useFilesStore } from '../stores/files.js'
-import { formatSize, formatRelativeTime, iconFor, pickFolderPreviewPaths } from './fileFormat.js'
+import { formatSize, formatRelativeTime, pickFolderPreviewPaths } from './fileFormat.js'
 import { previewUrl, listDirectory } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
@@ -11,7 +13,7 @@ const props = defineProps({
   entry: { type: Object, required: true },
   disableOpen: { type: Boolean, default: false },
 })
-const emit = defineEmits(['open', 'menu', 'changed'])
+const emit = defineEmits(['open', 'menu', 'changed', 'folder-opened'])
 const files = useFilesStore()
 
 const fullPath = computed(() =>
@@ -101,6 +103,7 @@ async function onClick() {
       // resolve against the right source.
       if (props.entry.source && props.entry.source !== files.source) files.source = props.entry.source
       await files.loadDirectory(fullPath.value)
+      emit('folder-opened')
     } catch (err) {
       showError(err.message || 'Could not open folder.')
     }
@@ -133,24 +136,25 @@ async function onStarClick() {
     <input
       type="checkbox"
       class="select-box"
+      :aria-label="`Select ${entry.name}`"
       :checked="isSelected"
       @click.stop="files.toggleSelect(selKey)"
     />
-    <button class="dots" @click.stop="emit('menu', { entry: { ...entry, source: entrySource }, path: fullPath })">⋮</button>
-    <button v-if="!disableOpen" class="star" :class="{ starred: isStarred }" @click.stop="onStarClick">
-      {{ isStarred ? '⭐' : '☆' }}
+    <button class="dots" :aria-label="`Actions for ${entry.name}`" @click.stop="emit('menu', { entry: { ...entry, source: entrySource }, path: fullPath })"><UiIcon name="more" /></button>
+    <button v-if="!disableOpen" class="star" :aria-label="`${isStarred ? 'Unstar' : 'Star'} ${entry.name}`" :class="{ starred: isStarred }" @click.stop="onStarClick">
+      <UiIcon name="starred" :size="17" />
     </button>
-    <div class="thumb" @click="onClick">
+    <button class="thumb" :aria-label="`Open ${entry.name}`" :disabled="disableOpen" @click="onClick">
       <div v-if="folderPreviewPaths.length" class="folder-grid">
         <img v-for="path in folderPreviewPaths" :key="path" :src="previewUrl(entrySource, path, 'small')" loading="lazy" />
       </div>
       <img v-else-if="showThumb" :src="thumbSrc" :alt="entry.name" loading="lazy" @error="thumbFailed = true" />
-      <template v-else>{{ iconFor(entry) }}</template>
-      <span v-if="entry.type === 'directory' && (folderPreviewPaths.length || showThumb)" class="folder-badge">📁</span>
-    </div>
-    <div class="name" :title="entry.name">{{ entry.displayName ?? entry.name }}</div>
+      <FileGlyph v-else :entry="entry" />
+      <span v-if="entry.type === 'directory' && (folderPreviewPaths.length || showThumb)" class="folder-badge"><UiIcon name="folder" :size="18" /></span>
+    </button>
+    <button class="name" :disabled="disableOpen" @click="onClick" :title="entry.name">{{ entry.displayName ?? entry.name }}</button>
     <div class="meta">
-      <span>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</span>
+      <span>{{ entry.type === 'directory' ? 'Folder' : formatSize(entry.size) }}</span>
       <span>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</span>
     </div>
   </div>

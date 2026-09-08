@@ -28,28 +28,28 @@ async function onSubmit() {
     <form class="login-panel" @submit.prevent="onSubmit">
       <div class="login-brand-row">
         <VaultaBrand />
-        <span class="node-status"><i></i> Private node</span>
+        <span class="node-status"><i></i> Personal cloud</span>
       </div>
 
-      <h1>Sign in</h1>
+      <div class="login-welcome"><h1>Your files.<br />Right at home.</h1><p>All your things, in your own space.</p></div>
       <p class="host">{{ host }}</p>
 
       <div class="rule"></div>
 
       <label class="field">
         <span class="field-label">Username</span>
-        <input v-model="username" autocomplete="username" autofocus />
+        <input v-model="username" autocomplete="username" autocapitalize="none" :spellcheck="false" placeholder="Your username" required />
       </label>
 
       <label class="field">
         <span class="field-label">Password</span>
-        <input v-model="password" type="password" autocomplete="current-password" />
+        <input v-model="password" type="password" autocomplete="current-password" placeholder="Your password" required />
       </label>
 
       <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
 
-      <button type="submit" :disabled="submitting">{{ submitting ? 'Signing in…' : 'Sign in' }}</button>
-      <p class="login-footnote">UID-based access · Home-hosted</p>
+      <button type="submit" :disabled="submitting">{{ submitting ? 'Signing in…' : 'Continue' }}</button>
+      <p class="login-footnote">Your storage. Your space.</p>
     </form>
   </div>
 </template>
