@@ -357,12 +357,12 @@ type apiServer struct {
 	statPath       string
 	sharePath      string
 	homePath       string
-	quotaPath      string
 	fileBrowserURL string
 	client         *http.Client
 	proxyTransport http.RoundTripper
 	profiles       *profileStore
 	ownerships     *ownershipStore
+	quotas         *quotaStore
 	onlyOfficeURL  string
 }
 
@@ -375,11 +375,9 @@ func newAPIServer(cfg apiServerConfig) (*apiServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The quota store itself lands in a later task; for now, fail fast if
-	// its directory cannot be prepared, so a malformed QuotaPath surfaces
-	// here rather than silently later.
-	if err := os.MkdirAll(filepath.Dir(cfg.QuotaPath), 0o750); err != nil {
-		return nil, fmt.Errorf("prepare quota directory: %w", err)
+	quotas, err := newQuotaStore(cfg.QuotaPath)
+	if err != nil {
+		return nil, err
 	}
 	client := cfg.Client
 	if client == nil {
@@ -389,12 +387,12 @@ func newAPIServer(cfg apiServerConfig) (*apiServer, error) {
 		statPath:       cfg.StatPath,
 		sharePath:      cfg.SharePath,
 		homePath:       cfg.HomePath,
-		quotaPath:      cfg.QuotaPath,
 		fileBrowserURL: strings.TrimRight(cfg.FileBrowserURL, "/"),
 		client:         client,
 		proxyTransport: cfg.ProxyTransport,
 		profiles:       profiles,
 		ownerships:     ownerships,
+		quotas:         quotas,
 		onlyOfficeURL:  cfg.OnlyOfficeURL,
 	}, nil
 }
@@ -409,6 +407,9 @@ func (s *apiServer) handler() http.Handler {
 	mux.HandleFunc("/ownership", s.handleOwnership)
 	mux.HandleFunc("/ownership/lookup", s.handleOwnershipLookup)
 	mux.HandleFunc("/ownership/move", s.handleOwnershipMove)
+	mux.HandleFunc("/quota", s.handleQuota)
+	mux.HandleFunc("/quotas", s.handleQuotas)
+	mux.HandleFunc("/quotas/", s.handleQuotaByUID)
 	return mux
 }
 

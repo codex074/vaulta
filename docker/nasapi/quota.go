@@ -4,8 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -131,4 +136,173 @@ func (s *quotaStore) saveLocked() error {
 		return fmt.Errorf("replace quotas: %w", err)
 	}
 	return nil
+}
+
+// quotaResponse is the shape returned both by GET /quota (self) and, keyed
+// by uid, inside GET /quotas (admin listing).
+type quotaResponse struct {
+	HasDrive   bool  `json:"hasDrive"`
+	Unlimited  bool  `json:"unlimited"`
+	LimitBytes int64 `json:"limitBytes"`
+	UsedBytes  int64 `json:"usedBytes"`
+}
+
+// homeDirFor resolves a user's private-drive directory from their FBQ
+// "home" scope. The scope value is the entire isolation boundary (FBQ
+// itself enforces it on every resource endpoint); the prefix check here is
+// defense in depth, not the primary containment mechanism.
+func (s *apiServer) homeDirFor(user fileBrowserUser) (string, bool) {
+	scope, ok := user.scopeFor("home")
+	if !ok {
+		return "", false
+	}
+	dir := filepath.Join(s.homePath, filepath.Clean("/"+scope))
+	if !strings.HasPrefix(dir+"/", s.homePath+"/") {
+		return "", false
+	}
+	return dir, true
+}
+
+// quotaFor computes the quota/usage view for one user: admins are always
+// unlimited (usedBytes is the whole home tree's size); a non-admin with no
+// home scope has no drive at all; a non-admin with a home scope but no
+// admin-set quota record has limitBytes 0 (fail closed, not unlimited).
+func (s *apiServer) quotaFor(user fileBrowserUser) quotaResponse {
+	if user.Permissions.Admin {
+		used, err := directorySize(s.homePath)
+		if err != nil {
+			log.Printf("compute home directory size for admin usage: %v", err)
+		}
+		return quotaResponse{HasDrive: true, Unlimited: true, UsedBytes: used}
+	}
+	dir, ok := s.homeDirFor(user)
+	if !ok {
+		return quotaResponse{}
+	}
+	record, _ := s.quotas.get(strconv.Itoa(user.ID))
+	used, err := directorySize(dir)
+	if err != nil {
+		log.Printf("compute usage for uid %d: %v", user.ID, err)
+	}
+	return quotaResponse{HasDrive: true, Unlimited: false, LimitBytes: record.LimitBytes, UsedBytes: used}
+}
+
+func (s *apiServer) handleQuota(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	user, status, err := s.fetchUser(r, "self")
+	if err != nil {
+		writeUpstreamError(w, status, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, s.quotaFor(user))
+}
+
+func (s *apiServer) handleQuotas(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	users, status, err := s.fetchUsers(r)
+	if err != nil {
+		writeUpstreamError(w, status, err)
+		return
+	}
+	quotas := make(map[string]quotaResponse, len(users))
+	for _, user := range users {
+		quotas[strconv.Itoa(user.ID)] = s.quotaFor(user)
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"quotas": quotas})
+}
+
+func (s *apiServer) handleQuotaByUID(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	uid, err := canonicalUID(strings.TrimPrefix(r.URL.Path, "/quotas/"))
+	if err != nil {
+		http.Error(w, "Invalid UID.", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		if _, status, err := s.fetchUser(r, uid); err != nil {
+			writeUpstreamError(w, status, err)
+			return
+		}
+		limit, ok := decodeQuotaLimit(w, r)
+		if !ok {
+			return
+		}
+		if err := s.quotas.set(uid, limit); err != nil {
+			log.Printf("save quota for uid %s: %v", uid, err)
+			http.Error(w, "Could not save quota.", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"uid": uid, "limitBytes": limit})
+	case http.MethodDelete:
+		if err := s.quotas.delete(uid); err != nil {
+			log.Printf("delete quota for uid %s: %v", uid, err)
+			http.Error(w, "Could not delete quota.", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		methodNotAllowed(w, http.MethodPut, http.MethodDelete)
+	}
+}
+
+func decodeQuotaLimit(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	var body struct {
+		LimitBytes int64 `json:"limitBytes"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		http.Error(w, "Invalid quota payload.", http.StatusBadRequest)
+		return 0, false
+	}
+	if body.LimitBytes < 0 {
+		http.Error(w, "limitBytes must be zero or greater.", http.StatusBadRequest)
+		return 0, false
+	}
+	return body.LimitBytes, true
+}
+
+// fetchUsers lists every FileBrowser user, forwarding the calling admin's
+// own auth headers — never a client-supplied identity — exactly like
+// fetchUser does for a single user.
+func (s *apiServer) fetchUsers(r *http.Request) ([]fileBrowserUser, int, error) {
+	request, err := http.NewRequestWithContext(r.Context(), http.MethodGet, s.fileBrowserURL+"/api/users", nil)
+	if err != nil {
+		return nil, http.StatusBadGateway, err
+	}
+	for _, header := range []string{"Cookie", "Authorization", "X-Auth"} {
+		if value := r.Header.Get(header); value != "" {
+			request.Header.Set(header, value)
+		}
+	}
+	response, err := s.client.Do(request)
+	if err != nil {
+		return nil, http.StatusBadGateway, fmt.Errorf("list users from FileBrowser: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+		return nil, response.StatusCode, fmt.Errorf("FileBrowser returned %s", response.Status)
+	}
+	var users []fileBrowserUser
+	if err := json.NewDecoder(io.LimitReader(response.Body, 4<<20)).Decode(&users); err != nil {
+		return nil, http.StatusBadGateway, fmt.Errorf("decode FileBrowser users: %w", err)
+	}
+	return users, http.StatusOK, nil
 }

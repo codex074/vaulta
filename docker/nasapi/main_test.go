@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -139,14 +140,29 @@ func (f *fakeFileBrowser) handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/api/users" {
-		if r.URL.Query().Get("id") == "self" {
+		id := r.URL.Query().Get("id")
+		if id == "self" {
 			writeJSON(w, http.StatusOK, f.self)
 			return
 		}
 		f.mu.Lock()
 		users := f.users
 		f.mu.Unlock()
-		writeJSON(w, http.StatusOK, users)
+		if id == "" {
+			writeJSON(w, http.StatusOK, users)
+			return
+		}
+		if strconv.Itoa(f.self.ID) == id {
+			writeJSON(w, http.StatusOK, f.self)
+			return
+		}
+		for _, user := range users {
+			if strconv.Itoa(user.ID) == id {
+				writeJSON(w, http.StatusOK, user)
+				return
+			}
+		}
+		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 
