@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   listDirectory, makeDirectory, deleteItem,
-  moveItem, renameItem, downloadUrl, previewUrl, uploadFile, getFileText,
+  moveItem, copyItem, renameItem, downloadUrl, previewUrl, uploadFile, getFileText,
 } from '../../src/api/resources.js'
+import * as ownership from '../../src/api/ownership.js'
+
+vi.mock('../../src/api/ownership.js', () => ({
+  moveOwnership: vi.fn(),
+}))
 
 describe('resources API', () => {
   beforeEach(() => {
     global.fetch = vi.fn()
+    vi.clearAllMocks()
   })
 
   it('listDirectory calls GET with source=share and returns JSON', async () => {
@@ -46,6 +52,24 @@ describe('resources API', () => {
     expect(body.items[0]).toEqual({
       fromSource: 'share', fromPath: '/Photos/a.jpg', toSource: 'share', toPath: '/Archive/a.jpg',
     })
+  })
+
+  it('moveItem carries the ownership record from source to destination', async () => {
+    global.fetch.mockResolvedValue({ ok: true, status: 200 })
+    await moveItem('/Photos/a.jpg', '/Archive/a.jpg')
+    expect(ownership.moveOwnership).toHaveBeenCalledWith('/Photos/a.jpg', '/Archive/a.jpg')
+  })
+
+  it('moveItem does not carry ownership forward for a copy (the source still exists)', async () => {
+    global.fetch.mockResolvedValue({ ok: true, status: 200 })
+    await copyItem('/Photos/a.jpg', '/Archive/a.jpg')
+    expect(ownership.moveOwnership).not.toHaveBeenCalled()
+  })
+
+  it('moveItem still succeeds when carrying ownership forward fails', async () => {
+    global.fetch.mockResolvedValue({ ok: true, status: 200 })
+    ownership.moveOwnership.mockRejectedValue(new Error('nasapi down'))
+    await expect(moveItem('/a.jpg', '/b.jpg')).resolves.toBeUndefined()
   })
 
   it('renameItem computes the sibling path from the parent directory', async () => {

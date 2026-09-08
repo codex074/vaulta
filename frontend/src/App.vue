@@ -6,8 +6,10 @@ import { useStarredStore } from './stores/starred.js'
 import { useTrashStore } from './stores/trash.js'
 import { useThemeStore } from './stores/theme.js'
 import { uploadFile, makeDirectory } from './api/resources.js'
+import { stampOwnership } from './api/ownership.js'
 import { onUnauthorized } from './api/http.js'
 import { showError } from './errorToast.js'
+import { partitionDeletable } from './permissions.js'
 import { collectFilesFromDataTransfer, directoriesFor } from './components/folderDrop.js'
 import LoginView from './components/LoginView.vue'
 import Sidebar from './components/Sidebar.vue'
@@ -85,11 +87,18 @@ async function onEntryChanged() {
 async function handleFiles(items) {
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
   for (const dir of directoriesFor(items.map((item) => item.path))) {
+    const dirPath = `${base}${dir}`
     try {
-      await makeDirectory(`${base}${dir}`)
+      await makeDirectory(dirPath)
     } catch {
       // Likely already exists (e.g. a sibling file created the same parent) — the
       // upload below will surface a real problem with this directory on its own.
+      continue
+    }
+    try {
+      await stampOwnership(dirPath)
+    } catch {
+      // Best-effort: ownership is UI metadata, not a security control.
     }
   }
   for (const { file, path } of items) {
@@ -97,6 +106,12 @@ async function handleFiles(items) {
     uploads.push(entry)
     try {
       await uploadFile(`${base}${path}`, file, (pct) => { entry.progress = pct })
+      try {
+        await stampOwnership(`${base}${path}`)
+      } catch {
+        // Best-effort: ownership is UI metadata, not a security control, so a
+        // failed stamp shouldn't surface as an upload failure.
+      }
     } catch (err) {
       entry.error = true
       entry.message = err.message || 'Failed'
@@ -115,17 +130,21 @@ async function onDrop(event) {
 const bulkError = ref('')
 async function onBulkDelete() {
   bulkError.value = ''
+  const sourceEntries = view.value === 'starred' ? starred.entries : view.value === 'trash' ? trash.entries : files.entries
+  const { allowed, blocked } = partitionDeletable(sourceEntries, files.selected, auth.user, files.currentPath)
   try {
     if (view.value === 'trash') {
-      const items = trash.entries.filter((e) => files.selected.has(e.path))
-      for (const item of items) {
+      for (const item of allowed) {
         await trash.deleteForeverItem(item)
       }
       files.clearSelection()
     } else {
-      await files.deleteSelected()
+      await files.deleteSelected(allowed.map((e) => e.path))
       if (view.value === 'starred') await starred.loadStarred()
       else await files.loadDirectory(files.currentPath)
+    }
+    if (blocked.length) {
+      bulkError.value = `Skipped (not your files): ${blocked.map((e) => e.name).join(', ')}`
     }
   } catch (err) {
     bulkError.value = err.message || 'Some items could not be deleted.'

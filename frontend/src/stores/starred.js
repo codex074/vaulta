@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { listDirectory } from '../api/resources.js'
+import { lookupOwnership } from '../api/ownership.js'
 
 async function walk(path) {
   const result = await listDirectory(path)
@@ -27,7 +28,14 @@ export const useStarredStore = defineStore('starred', {
       this.loading = true
       this.error = null
       try {
-        this.entries = await walk('/')
+        const found = await walk('/')
+        const records = (await lookupOwnership(found.map((entry) => entry.path))) || {}
+        this.entries = found.map((entry) => {
+          const record = records[entry.path]
+          return record
+            ? { ...entry, uploadedByUid: record.uploadedByUid, uploadedByUsername: record.uploadedByUsername }
+            : entry
+        })
       } catch (err) {
         this.error = err
         throw err

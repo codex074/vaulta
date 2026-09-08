@@ -48,6 +48,17 @@ type profileFile struct {
 	Profiles map[string]profile `json:"profiles"`
 }
 
+type ownership struct {
+	UploadedByUID      string    `json:"uploadedByUid"`
+	UploadedByUsername string    `json:"uploadedByUsername"`
+	UploadedAt         time.Time `json:"uploadedAt"`
+}
+
+type ownershipFile struct {
+	Version int                  `json:"version"`
+	Records map[string]ownership `json:"records"`
+}
+
 type profileStore struct {
 	mu       sync.RWMutex
 	path     string
@@ -157,15 +168,171 @@ func (s *profileStore) saveLocked() error {
 	return nil
 }
 
+type ownershipStore struct {
+	mu      sync.RWMutex
+	path    string
+	records map[string]ownership
+}
+
+func newOwnershipStore(path string) (*ownershipStore, error) {
+	store := &ownershipStore{path: path, records: make(map[string]ownership)}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return store, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read ownership: %w", err)
+	}
+
+	var payload ownershipFile
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, fmt.Errorf("decode ownership: %w", err)
+	}
+	if payload.Records != nil {
+		store.records = payload.Records
+	}
+	return store, nil
+}
+
+func (s *ownershipStore) lookup(paths []string) map[string]ownership {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make(map[string]ownership, len(paths))
+	for _, path := range paths {
+		if record, ok := s.records[path]; ok {
+			result[path] = record
+		}
+	}
+	return result
+}
+
+func (s *ownershipStore) set(path string, record ownership) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, existed := s.records[path]
+	s.records[path] = record
+	if err := s.saveLocked(); err != nil {
+		if existed {
+			s.records[path] = previous
+		} else {
+			delete(s.records, path)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *ownershipStore) delete(path string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous, existed := s.records[path]
+	if !existed {
+		return nil
+	}
+	delete(s.records, path)
+	if err := s.saveLocked(); err != nil {
+		s.records[path] = previous
+		return err
+	}
+	return nil
+}
+
+// move relocates a record from one path to another, carrying the original
+// uploader forward across renames and trash moves, and also relocates every
+// record nested under `from` (a folder move carries its children's owners
+// along too). A missing source record is not an error — the destination
+// simply ends up with no known owner.
+func (s *ownershipStore) move(from, to string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	relocations := map[string]string{}
+	if _, existed := s.records[from]; existed {
+		relocations[from] = to
+	}
+	prefix := from + "/"
+	for path := range s.records {
+		if strings.HasPrefix(path, prefix) {
+			relocations[path] = to + "/" + strings.TrimPrefix(path, prefix)
+		}
+	}
+	if len(relocations) == 0 {
+		return nil
+	}
+
+	undo := make(map[string]ownership, len(relocations))
+	removed := make(map[string]ownership, len(relocations))
+	for oldPath, newPath := range relocations {
+		if previous, hadIt := s.records[newPath]; hadIt {
+			undo[newPath] = previous
+		}
+		removed[oldPath] = s.records[oldPath]
+		s.records[newPath] = s.records[oldPath]
+		delete(s.records, oldPath)
+	}
+	if err := s.saveLocked(); err != nil {
+		for oldPath, newPath := range relocations {
+			delete(s.records, newPath)
+			if previous, hadIt := undo[newPath]; hadIt {
+				s.records[newPath] = previous
+			}
+			s.records[oldPath] = removed[oldPath]
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *ownershipStore) saveLocked() error {
+	directory := filepath.Dir(s.path)
+	if err := os.MkdirAll(directory, 0o750); err != nil {
+		return fmt.Errorf("create ownership directory: %w", err)
+	}
+	payload, err := json.MarshalIndent(ownershipFile{Version: 1, Records: s.records}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode ownership: %w", err)
+	}
+	temporary, err := os.CreateTemp(directory, "ownership-*.tmp")
+	if err != nil {
+		return fmt.Errorf("create ownership temp file: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		temporary.Close()
+		return fmt.Errorf("secure ownership temp file: %w", err)
+	}
+	if _, err := temporary.Write(payload); err != nil {
+		temporary.Close()
+		return fmt.Errorf("write ownership: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return fmt.Errorf("sync ownership: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close ownership: %w", err)
+	}
+	if err := os.Rename(temporaryPath, s.path); err != nil {
+		return fmt.Errorf("replace ownership: %w", err)
+	}
+	return nil
+}
+
 type apiServer struct {
 	statPath       string
 	fileBrowserURL string
 	client         *http.Client
 	profiles       *profileStore
+	ownerships     *ownershipStore
 }
 
-func newAPIServer(statPath, profilePath, fileBrowserURL string, client *http.Client) (*apiServer, error) {
+func newAPIServer(statPath, profilePath, ownershipPath, fileBrowserURL string, client *http.Client) (*apiServer, error) {
 	store, err := newProfileStore(profilePath)
+	if err != nil {
+		return nil, err
+	}
+	ownerships, err := newOwnershipStore(ownershipPath)
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +344,7 @@ func newAPIServer(statPath, profilePath, fileBrowserURL string, client *http.Cli
 		fileBrowserURL: strings.TrimRight(fileBrowserURL, "/"),
 		client:         client,
 		profiles:       store,
+		ownerships:     ownerships,
 	}, nil
 }
 
@@ -186,6 +354,9 @@ func (s *apiServer) handler() http.Handler {
 	mux.HandleFunc("/profile", s.handleMyProfile)
 	mux.HandleFunc("/profiles", s.handleProfiles)
 	mux.HandleFunc("/profiles/", s.handleProfileByUID)
+	mux.HandleFunc("/ownership", s.handleOwnership)
+	mux.HandleFunc("/ownership/lookup", s.handleOwnershipLookup)
+	mux.HandleFunc("/ownership/move", s.handleOwnershipMove)
 	return mux
 }
 
@@ -285,6 +456,133 @@ func (s *apiServer) handleProfileByUID(w http.ResponseWriter, r *http.Request) {
 	default:
 		methodNotAllowed(w, http.MethodPut, http.MethodDelete)
 	}
+}
+
+func (s *apiServer) handleOwnership(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		s.handleOwnershipStamp(w, r)
+	case http.MethodDelete:
+		s.handleOwnershipDelete(w, r)
+	default:
+		methodNotAllowed(w, http.MethodPost, http.MethodDelete)
+	}
+}
+
+// handleOwnershipStamp records the calling user as the uploader of a path.
+// The identity always comes from the authenticated session, never the
+// request body, so a caller cannot stamp a file with someone else's name.
+func (s *apiServer) handleOwnershipStamp(w http.ResponseWriter, r *http.Request) {
+	user, status, err := s.fetchUser(r, "self")
+	if err != nil {
+		writeUpstreamError(w, status, err)
+		return
+	}
+	path, ok := decodeOwnershipPath(w, r)
+	if !ok {
+		return
+	}
+	record := ownership{
+		UploadedByUID:      strconv.Itoa(user.ID),
+		UploadedByUsername: user.Username,
+		UploadedAt:         time.Now().UTC(),
+	}
+	if err := s.ownerships.set(path, record); err != nil {
+		log.Printf("save ownership for %s: %v", path, err)
+		http.Error(w, "Could not save ownership.", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, record)
+}
+
+func (s *apiServer) handleOwnershipDelete(w http.ResponseWriter, r *http.Request) {
+	if _, status, err := s.fetchUser(r, "self"); err != nil {
+		writeUpstreamError(w, status, err)
+		return
+	}
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, "path is required.", http.StatusBadRequest)
+		return
+	}
+	if err := s.ownerships.delete(path); err != nil {
+		log.Printf("delete ownership for %s: %v", path, err)
+		http.Error(w, "Could not delete ownership.", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleOwnershipLookup batch-reads ownership records for a directory listing
+// or a set of selected items in one round trip.
+func (s *apiServer) handleOwnershipLookup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	if _, status, err := s.fetchUser(r, "self"); err != nil {
+		writeUpstreamError(w, status, err)
+		return
+	}
+	var body struct {
+		Paths []string `json:"paths"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body.", http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"records": s.ownerships.lookup(body.Paths)})
+}
+
+// handleOwnershipMove carries an ownership record forward across a rename or
+// a trash move so delete permission survives the path change.
+func (s *apiServer) handleOwnershipMove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w, http.MethodPost)
+		return
+	}
+	if _, status, err := s.fetchUser(r, "self"); err != nil {
+		writeUpstreamError(w, status, err)
+		return
+	}
+	var body struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body.", http.StatusBadRequest)
+		return
+	}
+	if body.From == "" || body.To == "" {
+		http.Error(w, "from and to are required.", http.StatusBadRequest)
+		return
+	}
+	if err := s.ownerships.move(body.From, body.To); err != nil {
+		log.Printf("move ownership from %s to %s: %v", body.From, body.To, err)
+		http.Error(w, "Could not move ownership.", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func decodeOwnershipPath(w http.ResponseWriter, r *http.Request) (string, bool) {
+	var body struct {
+		Path string `json:"path"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		http.Error(w, "Invalid request body.", http.StatusBadRequest)
+		return "", false
+	}
+	if body.Path == "" {
+		http.Error(w, "path is required.", http.StatusBadRequest)
+		return "", false
+	}
+	return body.Path, true
 }
 
 func (s *apiServer) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
@@ -398,7 +696,7 @@ func main() {
 	fileBrowserURL := envOrDefault("NASAPI_FILEBROWSER_URL", "http://127.0.0.1:30334")
 	port := envOrDefault("NASAPI_PORT", "9190")
 
-	server, err := newAPIServer(statPath, filepath.Join(dataPath, "profiles.json"), fileBrowserURL, nil)
+	server, err := newAPIServer(statPath, filepath.Join(dataPath, "profiles.json"), filepath.Join(dataPath, "ownership.json"), fileBrowserURL, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { makeDirectory } from '../api/resources.js'
+import { stampOwnership } from '../api/ownership.js'
 import { useFilesStore } from '../stores/files.js'
 import { showError } from '../errorToast.js'
 
@@ -13,12 +14,18 @@ async function onSubmit() {
   if (!name.value.trim()) return
   submitting.value = true
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
+  const folderPath = `${base}${name.value.trim()}`
   try {
-    await makeDirectory(`${base}${name.value.trim()}`)
+    await makeDirectory(folderPath)
   } catch (err) {
     showError(err.message || 'Could not create folder.')
     submitting.value = false
     return
+  }
+  try {
+    await stampOwnership(folderPath)
+  } catch {
+    // Best-effort: ownership is UI metadata, not a security control.
   }
   emit('close')
   try {

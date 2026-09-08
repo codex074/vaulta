@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useStarredStore } from '../../src/stores/starred.js'
 import * as resources from '../../src/api/resources.js'
+import * as ownership from '../../src/api/ownership.js'
 
 vi.mock('../../src/api/resources.js', () => ({
   listDirectory: vi.fn(),
+}))
+vi.mock('../../src/api/ownership.js', () => ({
+  lookupOwnership: vi.fn(),
 }))
 
 describe('starred store', () => {
@@ -59,6 +63,23 @@ describe('starred store', () => {
       { name: 'c.jpg', type: 'image/jpeg', size: 2, modified: '2026-09-07T00:00:00Z', path: '/Photos/c.jpg', pinned: true },
     ])
     expect(resources.listDirectory).not.toHaveBeenCalledWith('/.trash')
+  })
+
+  it('loadStarred enriches entries with ownership metadata keyed by their path', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/', source: 'share',
+      folders: [],
+      files: [{ name: 'a.txt', type: 'text/plain', size: 1, modified: '2026-09-07T00:00:00Z' }],
+      pinnedItems: ['a.txt'],
+    })
+    ownership.lookupOwnership.mockResolvedValue({
+      '/a.txt': { uploadedByUid: '2', uploadedByUsername: 'jay' },
+    })
+    const store = useStarredStore()
+    await store.loadStarred()
+    expect(ownership.lookupOwnership).toHaveBeenCalledWith(['/a.txt'])
+    expect(store.entries[0].uploadedByUid).toBe('2')
+    expect(store.entries[0].uploadedByUsername).toBe('jay')
   })
 
   it('loadStarred sets loading and error state correctly on failure', async () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useTrashStore } from '../../src/stores/trash.js'
+import { useAuthStore } from '../../src/stores/auth.js'
 import * as trashApi from '../../src/api/trash.js'
 
 vi.mock('../../src/api/trash.js', () => ({
@@ -59,5 +60,17 @@ describe('trash store', () => {
     await store.emptyAll()
     expect(trashApi.emptyTrash).toHaveBeenCalledTimes(1)
     expect(trashApi.listTrash).toHaveBeenCalledTimes(1)
+  })
+
+  it('emptyAll passes a predicate that only allows items the current user may delete', async () => {
+    let capturedPredicate
+    trashApi.emptyTrash.mockImplementation(async (canDelete) => { capturedPredicate = canDelete })
+    trashApi.listTrash.mockResolvedValue([])
+    const store = useTrashStore()
+    const auth = useAuthStore()
+    auth.user = { uid: '3', permissions: { admin: false } }
+    await store.emptyAll()
+    expect(capturedPredicate({ uploadedByUid: '2' })).toBe(false)
+    expect(capturedPredicate({ uploadedByUid: '3' })).toBe(true)
   })
 })

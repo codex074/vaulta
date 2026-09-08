@@ -92,6 +92,7 @@ async function onDrop(event, entry) {
         <th>Name</th>
         <th>Size</th>
         <th>Modified</th>
+        <th>Uploaded by</th>
         <th></th>
       </tr>
     </thead>
@@ -133,6 +134,7 @@ async function onDrop(event, entry) {
         </td>
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
         <td>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</td>
+        <td class="uploader-col">{{ entry.uploadedByUsername || '—' }}</td>
         <td><button @click.stop="emit('menu', { entry, path: fullPath(entry) })">⋮</button></td>
       </tr>
     </tbody>
@@ -150,5 +152,6 @@ async function onDrop(event, entry) {
 .row-icon { display: inline-block; width: 20px; text-align: center; margin-right: 4px; }
 .list button { border: none; background: none; color: var(--text-muted); }
 .select-col, .star-col { width: 32px; }
+.uploader-col { color: var(--text-muted); font-size: 12px; }
 .star { font-size: 13px; }
 </style>

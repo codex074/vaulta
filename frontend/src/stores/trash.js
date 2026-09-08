@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { listTrash, restoreFromTrash, deleteForever, emptyTrash } from '../api/trash.js'
+import { useAuthStore } from './auth.js'
+import { canDeleteEntry } from '../permissions.js'
 
 export const useTrashStore = defineStore('trash', {
   state: () => ({ entries: [], loading: false, error: null }),
@@ -25,7 +27,8 @@ export const useTrashStore = defineStore('trash', {
       await this.loadTrash()
     },
     async emptyAll() {
-      await emptyTrash()
+      const auth = useAuthStore()
+      await emptyTrash((item) => canDeleteEntry(item, auth.user))
       await this.loadTrash()
     },
   },

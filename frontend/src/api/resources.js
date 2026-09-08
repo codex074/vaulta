@@ -1,4 +1,5 @@
 import { authorizedFetch, apiError, notifyUnauthorized } from './http.js'
+import { moveOwnership } from './ownership.js'
 
 const SOURCE = 'share'
 
@@ -68,6 +69,16 @@ export async function moveItem(fromPath, toPath, action = 'move') {
     }),
   })
   if (!response.ok) throw await apiError(response)
+  // A copy leaves the source in place with its own owner, so only a real
+  // move carries the ownership record forward. Best-effort: this is UI
+  // metadata, not a security control.
+  if (action === 'move') {
+    try {
+      await moveOwnership(fromPath, toPath)
+    } catch {
+      // ignore
+    }
+  }
 }
 
 export async function copyItem(fromPath, toPath) {

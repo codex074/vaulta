@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { dragPaths, beginDrag, selectionToDrag, isValidDropTarget, hasDragPayload, isWithin, moveInto } from '../../src/components/dragMove.js'
 
+vi.mock('../../src/api/ownership.js', () => ({
+  moveOwnership: vi.fn().mockResolvedValue(undefined),
+}))
+
 function fakeDataTransfer() {
   const store = {}
   return {

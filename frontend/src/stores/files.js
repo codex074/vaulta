@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { listDirectory } from '../api/resources.js'
 import { togglePinned } from '../api/pinned.js'
 import { softDelete } from '../api/trash.js'
+import { lookupOwnership } from '../api/ownership.js'
 import { useStarredStore } from './starred.js'
 
 const VIEW_MODE_KEY = 'nas-view-mode'
@@ -9,6 +10,11 @@ const VIEW_MODE_KEY = 'nas-view-mode'
 function parentOf(path) {
   const idx = path.lastIndexOf('/')
   return idx <= 0 ? '/' : path.slice(0, idx)
+}
+
+function joinPath(dir, name) {
+  const base = dir.endsWith('/') ? dir : `${dir}/`
+  return `${base}${name}`
 }
 
 export const useFilesStore = defineStore('files', {
@@ -29,7 +35,14 @@ export const useFilesStore = defineStore('files', {
         const result = await listDirectory(path)
         const folders = [...(result.folders || [])].sort((a, b) => a.name.localeCompare(b.name))
         const files = [...(result.files || [])].sort((a, b) => a.name.localeCompare(b.name))
-        this.entries = [...folders, ...files]
+        const entries = [...folders, ...files]
+        const records = (await lookupOwnership(entries.map((entry) => entry.path || joinPath(path, entry.name)))) || {}
+        this.entries = entries.map((entry) => {
+          const record = records[entry.path || joinPath(path, entry.name)]
+          return record
+            ? { ...entry, uploadedByUid: record.uploadedByUid, uploadedByUsername: record.uploadedByUsername }
+            : entry
+        })
         this.currentPath = path
         this.selected = new Set()
         this.pinnedNames = new Set(result.pinnedItems || [])
@@ -70,8 +83,7 @@ export const useFilesStore = defineStore('files', {
         starred.entries = starred.entries.filter((e) => e.path !== entry.path)
       }
     },
-    async deleteSelected() {
-      const paths = Array.from(this.selected)
+    async deleteSelected(paths = Array.from(this.selected)) {
       const failed = []
       for (const path of paths) {
         try {

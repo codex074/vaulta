@@ -1,4 +1,5 @@
 import { moveItem, uploadFile, getFileText, deleteItem, listDirectory, makeDirectory } from './resources.js'
+import { lookupOwnership, deleteOwnership } from './ownership.js'
 
 function basename(path) {
   const idx = path.lastIndexOf('/')
@@ -57,7 +58,13 @@ export async function listTrash() {
     const displayName = entry.name.replace(/^\d+__/, '')
     items.push({ ...entry, path: trashPath, trashPath, originalPath, deletedAt, hasMeta, displayName })
   }
-  return items
+  const records = (await lookupOwnership(items.map((item) => item.trashPath))) || {}
+  return items.map((item) => {
+    const record = records[item.trashPath]
+    return record
+      ? { ...item, uploadedByUid: record.uploadedByUid, uploadedByUsername: record.uploadedByUsername }
+      : item
+  })
 }
 
 export async function restoreFromTrash(item) {
@@ -72,6 +79,11 @@ export async function restoreFromTrash(item) {
 
 export async function deleteForever(item) {
   await deleteItem(item.trashPath)
+  try {
+    await deleteOwnership(item.trashPath)
+  } catch {
+    // Best-effort, see softDelete.
+  }
   if (!item.hasMeta) return
   try {
     await deleteItem(metaPathFor(item.trashPath))
@@ -80,7 +92,7 @@ export async function deleteForever(item) {
   }
 }
 
-export async function emptyTrash() {
+export async function emptyTrash(canDelete = () => true) {
   const result = await listDirectory('/.trash')
   const allEntries = [...(result.folders || []), ...(result.files || [])]
   const itemNames = new Set(allEntries.filter((e) => !e.name.endsWith('.trashmeta')).map((e) => e.name))
@@ -91,6 +103,7 @@ export async function emptyTrash() {
   const items = await listTrash()
   const failed = []
   for (const item of items) {
+    if (!canDelete(item)) continue
     try {
       await deleteForever(item)
     } catch (err) {

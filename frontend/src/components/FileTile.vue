@@ -83,6 +83,7 @@ async function onStarClick() {
   <div
     class="tile"
     :class="{ selected: isSelected, 'drop-target': isDropTarget, dragging: isDragging }"
+    :title="entry.uploadedByUsername ? `Uploaded by ${entry.uploadedByUsername}` : ''"
     :draggable="!disableOpen"
     @dragstart="onDragStart"
     @dragend="onDragEnd"

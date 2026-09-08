@@ -3,6 +3,7 @@ import {
   trashPathFor, metaPathFor, softDelete, listTrash, restoreFromTrash, deleteForever, emptyTrash,
 } from '../../src/api/trash.js'
 import * as resources from '../../src/api/resources.js'
+import * as ownership from '../../src/api/ownership.js'
 
 vi.mock('../../src/api/resources.js', () => ({
   moveItem: vi.fn(),
@@ -11,6 +12,10 @@ vi.mock('../../src/api/resources.js', () => ({
   deleteItem: vi.fn(),
   listDirectory: vi.fn(),
   makeDirectory: vi.fn(),
+}))
+vi.mock('../../src/api/ownership.js', () => ({
+  lookupOwnership: vi.fn(),
+  deleteOwnership: vi.fn(),
 }))
 
 describe('trash API', () => {
@@ -117,6 +122,20 @@ describe('trash API', () => {
     expect(items[0].deletedAt).toBeNull()
   })
 
+  it('listTrash enriches items with ownership metadata for their trash path', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/.trash', source: 'share',
+      folders: [],
+      files: [{ name: '1__a.jpg', type: 'image/jpeg', size: 10, modified: '2026-09-07T00:00:00Z' }],
+    })
+    ownership.lookupOwnership.mockResolvedValue({
+      '/.trash/1__a.jpg': { uploadedByUid: '2', uploadedByUsername: 'jay' },
+    })
+    const items = await listTrash()
+    expect(items[0].uploadedByUid).toBe('2')
+    expect(items[0].uploadedByUsername).toBe('jay')
+  })
+
   it('listTrash leaves originalPath/deletedAt null when a sidecar is missing', async () => {
     resources.listDirectory.mockResolvedValue({
       path: '/.trash', source: 'share',
@@ -150,6 +169,13 @@ describe('trash API', () => {
     expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg.trashmeta')
   })
 
+  it('deleteForever cleans up the ownership record for the trash path', async () => {
+    resources.deleteItem.mockResolvedValue(undefined)
+    ownership.deleteOwnership.mockResolvedValue(undefined)
+    await deleteForever({ trashPath: '/.trash/1__a.jpg', originalPath: '/Photos/a.jpg', hasMeta: true })
+    expect(ownership.deleteOwnership).toHaveBeenCalledWith('/.trash/1__a.jpg')
+  })
+
   it('deleteForever skips the sidecar delete when there was no sidecar', async () => {
     resources.deleteItem.mockResolvedValue(undefined)
     await deleteForever({ trashPath: '/.trash/2__b.jpg', originalPath: null, hasMeta: false })
@@ -178,6 +204,21 @@ describe('trash API', () => {
       path === '/.trash/2__b.jpg' ? Promise.reject(new Error('locked')) : Promise.resolve()
     )
     await expect(emptyTrash()).rejects.toThrow('/.trash/2__b.jpg')
+  })
+
+  it('emptyTrash skips items an optional predicate disallows, leaving them in trash', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/.trash', source: 'share',
+      folders: [],
+      files: [
+        { name: '1__a.jpg', type: 'image/jpeg', size: 1, modified: '2026-09-07T00:00:00Z' },
+        { name: '2__b.jpg', type: 'image/jpeg', size: 1, modified: '2026-09-07T00:00:00Z' },
+      ],
+    })
+    resources.deleteItem.mockResolvedValue(undefined)
+    await emptyTrash((item) => item.name !== '2__b.jpg')
+    expect(resources.deleteItem).toHaveBeenCalledWith('/.trash/1__a.jpg')
+    expect(resources.deleteItem).not.toHaveBeenCalledWith('/.trash/2__b.jpg')
   })
 
   it('emptyTrash also sweeps an orphaned .trashmeta whose item is already gone', async () => {

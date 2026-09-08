@@ -1,8 +1,10 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { renameItem, moveItem, downloadUrl } from '../api/resources.js'
 import { softDelete } from '../api/trash.js'
 import { useTrashStore } from '../stores/trash.js'
+import { useAuthStore } from '../stores/auth.js'
+import { canDeleteEntry } from '../permissions.js'
 import { showError } from '../errorToast.js'
 
 const props = defineProps({
@@ -12,6 +14,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'changed'])
 const trash = useTrashStore()
+const auth = useAuthStore()
+const canDelete = computed(() => canDeleteEntry(props.entry, auth.user))
 const renaming = ref(false)
 const moving = ref(false)
 const newName = ref(props.entry.name)
@@ -58,13 +62,15 @@ function doDeleteForever() {
       </template>
       <template v-else-if="view === 'trash'">
         <button @click="doRestore">Restore</button>
-        <button class="danger" @click="doDeleteForever">Delete forever</button>
+        <button v-if="canDelete" class="danger" @click="doDeleteForever">Delete forever</button>
+        <span v-else class="hint">Only {{ entry.uploadedByUsername }} or an admin can delete this forever</span>
       </template>
       <template v-else>
         <button @click="renaming = true">Rename</button>
         <button @click="moving = true">Move</button>
         <a :href="downloadUrl(path)" target="_blank" rel="noopener noreferrer">Download</a>
-        <button class="danger" @click="doDelete">Delete</button>
+        <button v-if="canDelete" class="danger" @click="doDelete">Delete</button>
+        <span v-else class="hint">Only {{ entry.uploadedByUsername }} or an admin can delete this</span>
       </template>
     </div>
   </div>
@@ -76,5 +82,6 @@ function doDeleteForever() {
 .menu button, .menu a { text-align: left; border: none; background: none; padding: 8px 10px; border-radius: 6px; color: var(--text); text-decoration: none; }
 .menu button:hover, .menu a:hover { background: var(--bg); }
 .menu .danger { color: var(--danger); }
+.menu .hint { padding: 8px 10px; font-size: 11px; color: var(--text-muted); max-width: 200px; }
 .menu input { margin: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
 </style>

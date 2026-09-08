@@ -5,6 +5,7 @@ import { useStarredStore } from '../../src/stores/starred.js'
 import * as resources from '../../src/api/resources.js'
 import * as pinned from '../../src/api/pinned.js'
 import * as trash from '../../src/api/trash.js'
+import * as ownership from '../../src/api/ownership.js'
 
 vi.mock('../../src/api/resources.js', () => ({
   listDirectory: vi.fn(),
@@ -14,6 +15,9 @@ vi.mock('../../src/api/pinned.js', () => ({
 }))
 vi.mock('../../src/api/trash.js', () => ({
   softDelete: vi.fn(),
+}))
+vi.mock('../../src/api/ownership.js', () => ({
+  lookupOwnership: vi.fn(),
 }))
 
 describe('files store', () => {
@@ -93,6 +97,35 @@ describe('files store', () => {
     const store = useFilesStore()
     await store.loadDirectory('/')
     expect(store.pinnedNames).toEqual(new Set(['a.txt']))
+  })
+
+  it('loadDirectory enriches entries with ownership metadata keyed by full path', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/', source: 'share',
+      folders: [],
+      files: [{ name: 'a.jpg', type: 'image/jpeg' }, { name: 'b.jpg', type: 'image/jpeg' }],
+    })
+    ownership.lookupOwnership.mockResolvedValue({
+      '/a.jpg': { uploadedByUid: '2', uploadedByUsername: 'jay' },
+    })
+    const store = useFilesStore()
+    await store.loadDirectory('/')
+    expect(ownership.lookupOwnership).toHaveBeenCalledWith(['/a.jpg', '/b.jpg'])
+    const a = store.entries.find((e) => e.name === 'a.jpg')
+    const b = store.entries.find((e) => e.name === 'b.jpg')
+    expect(a.uploadedByUid).toBe('2')
+    expect(a.uploadedByUsername).toBe('jay')
+    expect(b.uploadedByUid).toBeUndefined()
+  })
+
+  it('loadDirectory tolerates a failed ownership lookup, leaving entries unenriched', async () => {
+    resources.listDirectory.mockResolvedValue({
+      path: '/', source: 'share', folders: [], files: [{ name: 'a.jpg', type: 'image/jpeg' }],
+    })
+    ownership.lookupOwnership.mockResolvedValue(undefined)
+    const store = useFilesStore()
+    await store.loadDirectory('/')
+    expect(store.entries[0].uploadedByUid).toBeUndefined()
   })
 
   it('loadDirectory defaults pinnedNames to empty when the response omits pinnedItems', async () => {
