@@ -112,8 +112,15 @@ function onOfficeLoadError() {
 
 <template>
   <div class="backdrop" @click.self="$emit('close')">
-    <div class="frame">
-      <button class="close" @click="$emit('close')">✕</button>
+    <div class="frame" :class="{ 'frame-office': kind === 'office' }">
+      <button
+        class="close"
+        :class="{ 'close-office': kind === 'office' }"
+        @click="$emit('close')"
+      >
+        <template v-if="kind === 'office'">← กลับ</template>
+        <template v-else>✕</template>
+      </button>
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
       <iframe v-else-if="kind === 'pdf'" :src="pdfSrc" title="PDF preview" />
@@ -146,6 +153,33 @@ function onOfficeLoadError() {
 .office-frame { width: calc(80vw - 40px); height: calc(85vh - 40px); }
 .office-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
 .office-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
+.frame.frame-office {
+  max-width: 100vw;
+  max-height: 100vh;
+  max-height: 100dvh;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  border-radius: 0;
+}
+.frame.frame-office .office-frame { width: 100%; height: 100%; }
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
+.close-office {
+  top: 16px;
+  left: 16px;
+  right: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 1;
+}
 .fallback { text-align: center; }
 </style>
