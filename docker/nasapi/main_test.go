@@ -111,12 +111,14 @@ type recordedRequest struct {
 // (method, raw query, headers, body) under a mutex before answering `200 {}`
 // — used by the gate tests to prove requests reach FBQ unchanged.
 type fakeFileBrowser struct {
-	mu       sync.Mutex
-	server   *httptest.Server
-	self     fileBrowserUser
-	users    []fileBrowserUser
-	requests []recordedRequest
-	down     bool
+	mu           sync.Mutex
+	server       *httptest.Server
+	self         fileBrowserUser
+	users        []fileBrowserUser
+	requests     []recordedRequest
+	userLookups  int
+	down         bool
+	identityDown bool
 }
 
 func newFakeFileBrowser(t *testing.T, self fileBrowserUser) *fakeFileBrowser {
@@ -134,13 +136,21 @@ func (f *fakeFileBrowser) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	f.mu.Lock()
 	down := f.down
+	identityDown := f.identityDown
 	f.mu.Unlock()
 	if down {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	if r.URL.Path == "/api/users" {
+		f.mu.Lock()
+		f.userLookups++
+		f.mu.Unlock()
 		id := r.URL.Query().Get("id")
+		if identityDown {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 		if id == "self" {
 			writeJSON(w, http.StatusOK, f.self)
 			return
@@ -192,12 +202,24 @@ func (f *fakeFileBrowser) setDown(down bool) {
 	f.mu.Unlock()
 }
 
+func (f *fakeFileBrowser) setIdentityDown(down bool) {
+	f.mu.Lock()
+	f.identityDown = down
+	f.mu.Unlock()
+}
+
 func (f *fakeFileBrowser) recorded() []recordedRequest {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := make([]recordedRequest, len(f.requests))
 	copy(out, f.requests)
 	return out
+}
+
+func (f *fakeFileBrowser) userLookupCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.userLookups
 }
 
 func request(t *testing.T, handler http.Handler, method, path, body string, authenticated bool) *httptest.ResponseRecorder {

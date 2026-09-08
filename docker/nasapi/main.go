@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -359,12 +360,15 @@ type apiServer struct {
 	homePath       string
 	fileBrowserURL string
 	client         *http.Client
-	proxyTransport http.RoundTripper
 	profiles       *profileStore
 	ownerships     *ownershipStore
 	quotas         *quotaStore
+	usage          *usageTracker
+	proxy          *httputil.ReverseProxy
 	onlyOfficeURL  string
 }
+
+const usageCacheTTL = 30 * time.Second
 
 func newAPIServer(cfg apiServerConfig) (*apiServer, error) {
 	profiles, err := newProfileStore(cfg.ProfilePath)
@@ -383,16 +387,25 @@ func newAPIServer(cfg apiServerConfig) (*apiServer, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 5 * time.Second}
 	}
+	proxyTransport := cfg.ProxyTransport
+	if proxyTransport == nil {
+		proxyTransport = http.DefaultTransport.(*http.Transport).Clone()
+	}
+	proxy, err := newResourcesProxy(cfg.FileBrowserURL, proxyTransport)
+	if err != nil {
+		return nil, err
+	}
 	return &apiServer{
 		statPath:       cfg.StatPath,
 		sharePath:      cfg.SharePath,
 		homePath:       cfg.HomePath,
 		fileBrowserURL: strings.TrimRight(cfg.FileBrowserURL, "/"),
 		client:         client,
-		proxyTransport: cfg.ProxyTransport,
 		profiles:       profiles,
 		ownerships:     ownerships,
 		quotas:         quotas,
+		usage:          newUsageTracker(usageCacheTTL),
+		proxy:          proxy,
 		onlyOfficeURL:  cfg.OnlyOfficeURL,
 	}, nil
 }
@@ -410,6 +423,7 @@ func (s *apiServer) handler() http.Handler {
 	mux.HandleFunc("/quota", s.handleQuota)
 	mux.HandleFunc("/quotas", s.handleQuotas)
 	mux.HandleFunc("/quotas/", s.handleQuotaByUID)
+	mux.HandleFunc("/api/resources", s.handleResourcesGate)
 	return mux
 }
 
