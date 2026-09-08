@@ -53,12 +53,11 @@ server:
   port: 30334
   database: /config/filebrowser.db
   cacheDir: /.cache
+  internalUrl: http://192.168.1.22:30334   # how OnlyOffice reaches FileBrowser back to fetch the file — must be reachable from OnlyOffice's own bridge network, so this has to be the VM's real LAN IP, not 127.0.0.1 (that loopback belongs to the OnlyOffice container itself, not the host, since OnlyOffice runs on a bridge network — see Component 1).
   sources:
     - path: /srv/share
       config:
         defaultEnabled: true
-http:
-  internalUrl: http://192.168.1.22:30334   # how OnlyOffice reaches FileBrowser back to fetch the file — must be reachable from OnlyOffice's own bridge network, so this has to be the VM's real LAN IP, not 127.0.0.1 (that loopback belongs to the OnlyOffice container itself, not the host, since OnlyOffice runs on a bridge network — see Component 1). This was originally written as 127.0.0.1 during design and caught as wrong before implementation: every document open would have failed with a download error.
 integrations:
   office:
     url: https://office.codex074.com     # how the browser + FileBrowser reach OnlyOffice
@@ -67,7 +66,9 @@ integrations:
     viewOnly: true
 ```
 
-Requires restarting the `filebrowser-quantum` container (config is read at startup only) — done once during rollout, not part of the normal `nas-webui` deploy pipeline.
+**Corrected twice before/during implementation, both caught by checking primary sources instead of assuming:** (1) at design time, `internalUrl` was first written as `127.0.0.1` and corrected to the VM's real LAN IP once OnlyOffice was decided to run on a bridge network, not host. (2) During actual implementation (Task 4 of the plan), placing `internalUrl` under a top-level `http:` key — matching the *default-branch* `structs.go` this design was researched against — crashed the container: the **actually-deployed version is `v1.5.5-stable`**, an older schema where `Server.InternalUrl` (confirmed via that exact tag's `backend/common/settings/structs.go` on GitHub) lives under `server:`, and the `Http` struct in that version has no `internalUrl` field at all. The table above reflects the corrected, verified-working schema for `v1.5.5-stable`. **Lesson for future changes to this integration:** check the schema against the exact deployed image tag (`docker ps` → image tag → that tag's source on GitHub), not the repository's default branch, before writing config for a service this app doesn't control the deployment lifecycle of.
+
+Requires restarting the `filebrowser-quantum` container (config is read at startup only) — done once during rollout, not part of the normal `nas-webui` deploy pipeline. Restarting it interrupts file browsing for anyone using the site at that moment (briefly — confirmed recovery within ~10s in practice).
 
 ## Component 3: `nasapi` — new `/config` endpoint
 
