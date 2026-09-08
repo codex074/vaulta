@@ -168,8 +168,11 @@ func (s *apiServer) homeDirFor(user fileBrowserUser) (string, bool) {
 // home scope has no drive at all; a non-admin with a home scope but no
 // admin-set quota record has limitBytes 0 (fail closed, not unlimited).
 func (s *apiServer) quotaFor(user fileBrowserUser) quotaResponse {
+	// Usage comes from the same tracker the gate reserves against, so the
+	// number a user sees in the sidebar is the number their next upload is
+	// judged by (including bytes committed by uploads inside the cache TTL).
 	if user.Permissions.Admin {
-		used, err := directorySize(s.homePath)
+		used, err := s.usage.used(s.homePath)
 		if err != nil {
 			log.Printf("compute home directory size for admin usage: %v", err)
 		}
@@ -180,7 +183,7 @@ func (s *apiServer) quotaFor(user fileBrowserUser) quotaResponse {
 		return quotaResponse{}
 	}
 	record, _ := s.quotas.get(strconv.Itoa(user.ID))
-	used, err := directorySize(dir)
+	used, err := s.usage.used(dir)
 	if err != nil {
 		log.Printf("compute usage for uid %d: %v", user.ID, err)
 	}
