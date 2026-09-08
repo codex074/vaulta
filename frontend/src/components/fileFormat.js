@@ -20,6 +20,14 @@ export function formatRelativeTime(isoString, now = new Date()) {
   return `${Math.round(diffMs / week)}w ago`
 }
 
+export function pickFolderPreviewPaths(result, basePath, limit = 4) {
+  const base = basePath.endsWith('/') ? basePath : `${basePath}/`
+  return (result.files || [])
+    .filter((file) => file.hasPreview)
+    .slice(0, limit)
+    .map((file) => `${base}${file.name}`)
+}
+
 export function iconFor(entry) {
   if (entry.type === 'directory') return '📁'
   if (entry.type.startsWith('image/')) return '🖼️'

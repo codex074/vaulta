@@ -1,8 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useFilesStore } from '../stores/files.js'
-import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
-import { previewUrl } from '../api/resources.js'
+import { formatSize, formatRelativeTime, iconFor, pickFolderPreviewPaths } from './fileFormat.js'
+import { previewUrl, listDirectory } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
 
@@ -57,6 +57,25 @@ watch(fullPath, () => { thumbFailed.value = false })
 const showThumb = computed(() => props.entry.hasPreview && !thumbFailed.value)
 const thumbSrc = computed(() => previewUrl(fullPath.value, 'small'))
 
+// A folder's own preview is just one cover image from FileBrowser Quantum —
+// fetch its immediate children to build a 2x2 collage instead, so a photo
+// folder reads as a folder of photos rather than a single image file.
+const folderPreviewPaths = ref([])
+watch(
+  fullPath,
+  async (path) => {
+    folderPreviewPaths.value = []
+    if (props.entry.type !== 'directory' || !props.entry.hasPreview) return
+    try {
+      const result = await listDirectory(path)
+      if (fullPath.value === path) folderPreviewPaths.value = pickFolderPreviewPaths(result, path)
+    } catch {
+      // Best-effort — falls back to the single cover thumbnail below.
+    }
+  },
+  { immediate: true }
+)
+
 async function onClick() {
   if (props.disableOpen) return
   if (props.entry.type === 'directory') {
@@ -102,9 +121,12 @@ async function onStarClick() {
       {{ isStarred ? '⭐' : '☆' }}
     </button>
     <div class="thumb" @click="onClick">
-      <img v-if="showThumb" :src="thumbSrc" :alt="entry.name" loading="lazy" @error="thumbFailed = true" />
+      <div v-if="folderPreviewPaths.length" class="folder-grid">
+        <img v-for="path in folderPreviewPaths" :key="path" :src="previewUrl(path, 'small')" loading="lazy" />
+      </div>
+      <img v-else-if="showThumb" :src="thumbSrc" :alt="entry.name" loading="lazy" @error="thumbFailed = true" />
       <template v-else>{{ iconFor(entry) }}</template>
-      <span v-if="showThumb && entry.type === 'directory'" class="folder-badge">📁</span>
+      <span v-if="entry.type === 'directory' && (folderPreviewPaths.length || showThumb)" class="folder-badge">📁</span>
     </div>
     <div class="name" :title="entry.name">{{ entry.displayName ?? entry.name }}</div>
     <div class="meta">
@@ -130,6 +152,8 @@ async function onStarClick() {
 .tile.drop-target { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .thumb { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 40px; background: var(--bg); border-radius: 8px; cursor: pointer; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.folder-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; width: 100%; height: 100%; }
+.folder-grid img { width: 100%; height: 100%; object-fit: cover; }
 .folder-badge {
   position: absolute;
   bottom: 4px;
