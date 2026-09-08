@@ -42,4 +42,5 @@ behavior independently of its presentation.
 These are browser viewport checks, not physical-device Safari verification.
 The fixture identities and files in review screenshots are synthetic. Live
 login, uploads, quota enforcement, and OnlyOffice against the NAS were not
-exercised in this design pass. No production deployment was performed.
+exercised in this design pass. The subsequent production deployment and its
+verification are recorded in [the deployment log](../deployments/2026-09-09-ios-redesign.md).

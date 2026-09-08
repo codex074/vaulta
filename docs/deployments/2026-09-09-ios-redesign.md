@@ -43,12 +43,59 @@ Codex task: `01a081cf-d3e6-78a1-9480-30b176c983c9`
 
 ## Deployment
 
-Status: preparing the linux/amd64 image using the established AGENTS.md path.
+Status: **deployed and verified** on 2026-09-09, by 06:56 ICT.
+Source release commit: `4baa7f3` (`Redesign Vaulta for iPhone and iPad`).
 Deployment target: TrueNAS VM 105 on Proxmox pve2 (`100.71.13.117`).
-Compose project: `ix-nas-webui`. Image: `nas-webui:local`.
+Compose project: `ix-nas-webui`. Image: `nas-webui:local`, `linux/amd64`.
+Running container: `ix-nas-webui-nas-webui-1` (`running`).
 
-The final image identity, transfer checksums, time, and public bundle checks
-will be recorded here after deployment completes.
+Running image ID:
+`sha256:89184115e57546066d9a3acc76e5eab7d91539d1d3ce3ae17d67006c1a06f58e`
+
+Archive MD5, matched independently on Mac, pve2 and TrueNAS:
+`b03ca4ab3a1304ed853eb22beaf78bfe`
+
+### Execution record
+
+1. Built the image from the committed worktree with the prescribed
+   `docker build --platform linux/amd64 -f docker/Dockerfile -t nas-webui:local .`.
+   The container build's Vite/PWA production compilation passed.
+2. Tagged the prior live image `nas-webui:pre-ios-20260909` for rollback.
+   Prior image ID:
+   `sha256:7cdd24ebb5dab7e8b639be55dd459b3ca5087c6b2c667b96d489feb383658090`.
+3. Exported the 32 MB archive, transferred it to pve2, and verified MD5.
+   Automatic approval review initially blocked SCP pending destination
+   evidence. Read-only checks confirmed the SSH host is pve2 and VM 105
+   serves the same Vaulta HTML/assets as the public production URL. The same
+   SCP command was then approved and completed.
+4. Started the temporary transfer server bound to `192.168.1.16:8765`,
+   restricted to a fresh directory containing only a symlink to the release
+   archive. Downloaded it into VM 105 and confirmed the same MD5 there.
+5. Stopped the exact temporary server PID, removed its directory and the pve2
+   archive, then loaded the image into TrueNAS. Confirmed amd64 architecture.
+6. Recreated only the documented Compose project using the exact rendered
+   compose path and `-p ix-nas-webui up -d --force-recreate`.
+7. Verified the running image ID and public HTTP/bundle checks below.
+   FileBrowser Quantum remained healthy; OnlyOffice and the Cloudflare tunnel
+   remained running. Removed the temporary archive from TrueNAS.
+8. Automatic approval review rejected broad `docker image prune -f` because
+   it could remove unrelated images on the shared production VM. No image
+   pruning was performed; cleanup was limited to this release's transfer
+   files/server, and the previous Vaulta image remains tagged for rollback.
+
+### Public verification
+
+- `https://nas.codex074.com/`: **HTTP 200**.
+- `https://nas.codex074.com/nasapi/storage`: **HTTP 200**.
+- Public HTML references the new JS/CSS filenames and light theme color.
+- Both downloaded production assets are byte-for-byte equal to the tested
+  build, with SHA-256 checksums:
+  - `assets/index-BJP2P3aU.js`:
+    `f9b516241acab9ee00e55a9cdb1a60372e30c302fce2db5036050d2b70d8f6e3`
+  - `assets/index-B7brrpby.css`:
+    `c05599099ab35839aec02f5a74214c6e1c11b248091761ed4e862ee43f664bc0`
+- JS includes the new `Add to Starred`, `Your files.` and `folder-opened`
+  markers; CSS includes the new mobile account-label styles.
 
 ## Verification limits
 
