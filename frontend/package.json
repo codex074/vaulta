@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@onlyoffice/document-editor-vue": "^1.6.1",
     "pinia": "^4.0.3",
     "plyr": "^3.8.4",
     "vue": "^3.5.41"
