@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
+import VaultaBrand from './VaultaBrand.vue'
 
 const auth = useAuthStore()
 const username = ref('')
@@ -25,11 +26,9 @@ async function onSubmit() {
 <template>
   <div class="login-screen">
     <form class="login-panel" @submit.prevent="onSubmit">
-      <div class="bays" aria-hidden="true">
-        <span class="bay bay-lit"></span>
-        <span class="bay"></span>
-        <span class="bay"></span>
-        <span class="bay"></span>
+      <div class="login-brand-row">
+        <VaultaBrand />
+        <span class="node-status"><i></i> Private node</span>
       </div>
 
       <h1>Sign in</h1>
@@ -50,6 +49,7 @@ async function onSubmit() {
       <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
 
       <button type="submit" :disabled="submitting">{{ submitting ? 'Signing in…' : 'Sign in' }}</button>
+      <p class="login-footnote">UID-based access · Home-hosted</p>
     </form>
   </div>
 </template>
@@ -89,24 +89,16 @@ async function onSubmit() {
   box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
 }
 
-.bays {
+.login-brand-row {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 2px;
 }
-
-.bay {
-  width: 6px;
-  height: 6px;
-  border-radius: 1px;
-  background: var(--edge);
-}
-
-.bay-lit {
-  background: var(--signal);
-  box-shadow: 0 0 6px var(--signal);
-  animation: pulse 2.4s ease-in-out infinite;
-}
+.node-status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 10px; color: var(--slate); }
+.node-status i { width: 6px; height: 6px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 8px var(--signal); animation: pulse 2.4s ease-in-out infinite; }
+.login-footnote { margin: 2px 0 0; text-align: center; color: var(--slate); letter-spacing: .08em; text-transform: uppercase; font-size: 9px; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -114,7 +106,7 @@ async function onSubmit() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bay-lit { animation: none; }
+  .node-status i { animation: none; }
 }
 
 .login-panel h1 {

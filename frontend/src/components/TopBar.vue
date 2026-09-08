@@ -5,6 +5,7 @@ import { showError } from '../errorToast.js'
 import { dragPaths, isValidDropTarget, hasDragPayload, isWithin, moveInto } from './dragMove.js'
 import { entryPath } from './pathHelpers.js'
 import ThemeToggle from './ThemeToggle.vue'
+import UiIcon from './UiIcon.vue'
 
 const props = defineProps({
   entries: { type: Array, default: () => [] },
@@ -86,11 +87,19 @@ async function onDrop(event, path) {
         <span v-if="i < crumbs.length - 1"> / </span>
       </span>
     </nav>
-    <input class="search" placeholder="Search" @input="emit('search', $event.target.value)" />
-    <button @click="files.toggleViewMode()">{{ files.viewMode === 'grid' ? '☰ List' : '▦ Grid' }}</button>
-    <button @click="emit('upload')">⬆ Upload</button>
-    <button @click="emit('new-folder')">+ New folder</button>
-    <ThemeToggle />
+    <label class="search-wrap">
+      <UiIcon name="search" :size="17" />
+      <input class="search" placeholder="Find in this space" @input="emit('search', $event.target.value)" />
+    </label>
+    <div class="toolbar-actions">
+      <button class="toolbar-button" :aria-label="files.viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'" @click="files.toggleViewMode()">
+        <UiIcon :name="files.viewMode === 'grid' ? 'list' : 'grid'" />
+        <span>{{ files.viewMode === 'grid' ? 'List' : 'Grid' }}</span>
+      </button>
+      <button class="toolbar-button" @click="emit('upload')"><UiIcon name="upload" /><span>Upload</span></button>
+      <button class="toolbar-button primary-action" @click="emit('new-folder')"><UiIcon name="folder-plus" /><span>New folder</span></button>
+      <ThemeToggle />
+    </div>
   </header>
 </template>
 
@@ -101,6 +110,10 @@ async function onDrop(event, path) {
 .crumb { border: none; background: none; color: var(--text); font-weight: 600; padding: 4px; }
 .crumb:hover { color: var(--accent); }
 .crumb.drop-target { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); border-radius: 2px; }
-.search { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; width: 200px; }
+.search-wrap { position: relative; display: flex; align-items: center; color: var(--text-muted); }
+.search-wrap > svg { position: absolute; z-index: 1; left: 12px; pointer-events: none; }
+.search { padding: 8px 10px 8px 38px; border: 1px solid var(--border); border-radius: 8px; width: 200px; }
+.toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.toolbar-button { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .topbar button { border: 1px solid var(--border); background: var(--bg-elevated); border-radius: 8px; padding: 8px 12px; }
 </style>

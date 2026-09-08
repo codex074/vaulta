@@ -5,6 +5,8 @@ import { getStorageUsage } from '../api/storage.js'
 import { formatSize } from './fileFormat.js'
 import AccountSettingsDialog from './AccountSettingsDialog.vue'
 import ManageUsersDialog from './ManageUsersDialog.vue'
+import VaultaBrand from './VaultaBrand.vue'
+import UiIcon from './UiIcon.vue'
 
 defineProps({ view: { type: String, required: true } })
 const emit = defineEmits(['upload', 'navigate'])
@@ -12,6 +14,7 @@ const auth = useAuthStore()
 const showAccountMenu = ref(false)
 const showAccountSettings = ref(false)
 const showManageUsers = ref(false)
+const accountInitial = computed(() => (auth.user?.displayName || auth.user?.username || 'A').trim().charAt(0).toUpperCase())
 
 function openAccountSettings() {
   showAccountMenu.value = false
@@ -58,27 +61,30 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <nav class="sidebar">
+  <nav class="sidebar" aria-label="Primary navigation">
+    <VaultaBrand class="sidebar-brand" />
+    <p class="nav-label">Workspace</p>
     <button class="sidebar-item" :class="{ active: view === 'browse' }" @click="emit('navigate', 'browse')">
-      <span class="sidebar-icon">🏠</span>
+      <span class="sidebar-icon"><UiIcon name="home" /></span>
       <span class="sidebar-label">Home</span>
     </button>
     <button class="sidebar-item" :class="{ active: view === 'starred' }" @click="emit('navigate', 'starred')">
-      <span class="sidebar-icon">⭐</span>
+      <span class="sidebar-icon"><UiIcon name="starred" /></span>
       <span class="sidebar-label">Starred</span>
     </button>
     <button class="sidebar-item" :class="{ active: view === 'trash' }" @click="emit('navigate', 'trash')">
-      <span class="sidebar-icon">🗑️</span>
+      <span class="sidebar-icon"><UiIcon name="trash" /></span>
       <span class="sidebar-label">Trash</span>
     </button>
-    <button class="sidebar-item" @click="emit('upload')">
-      <span class="sidebar-icon">⬆️</span>
-      <span class="sidebar-label">Upload</span>
+    <button class="sidebar-item upload-item" @click="emit('upload')">
+      <span class="sidebar-icon"><UiIcon name="upload" /></span>
+      <span class="sidebar-label">Bring files in</span>
+      <UiIcon class="upload-arrow" name="chevron" :size="15" />
     </button>
     <div class="sidebar-spacer"></div>
     <div v-if="!storageError" class="storage">
       <div class="storage-header">
-        <span class="storage-icon">☁️</span>
+        <span class="storage-icon"><UiIcon name="storage" :size="16" /></span>
         <span>Storage</span>
       </div>
       <div class="storage-bar"><div class="storage-fill" :style="{ width: usagePercent + '%', background: fillColor }"></div></div>
@@ -86,8 +92,9 @@ onUnmounted(() => {
     </div>
     <div class="account-wrapper">
       <button class="sidebar-item" :class="{ active: showAccountMenu }" @click="showAccountMenu = !showAccountMenu">
-        <span class="sidebar-icon">👤</span>
+        <span class="account-avatar">{{ accountInitial }}</span>
         <span class="sidebar-label">{{ auth.user?.displayName || auth.user?.username || 'Account' }}</span>
+        <UiIcon class="account-arrow" name="chevron" :size="14" />
       </button>
       <div v-if="showAccountMenu" class="account-backdrop" @click="showAccountMenu = false"></div>
       <div v-if="showAccountMenu" class="account-menu">
@@ -119,6 +126,8 @@ onUnmounted(() => {
   gap: 2px;
 }
 .sidebar-spacer { flex: 1; }
+.sidebar-brand { margin: 2px 10px 22px; }
+.nav-label { margin: 0 12px 5px; color: var(--text-muted); letter-spacing: .14em; text-transform: uppercase; font-size: 9px; font-weight: 700; }
 .sidebar-item {
   display: flex;
   align-items: center;
@@ -137,8 +146,10 @@ onUnmounted(() => {
 .sidebar-item:hover { background: var(--bg); }
 .sidebar-item.active { background: var(--border); font-weight: 600; }
 .sidebar-item.active:hover { background: var(--border); }
-.sidebar-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+.sidebar-icon { display: grid; width: 24px; place-items: center; flex-shrink: 0; }
 .sidebar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upload-arrow, .account-arrow { margin-left: auto; opacity: .45; }
+.account-avatar { display: grid; width: 26px; height: 26px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border); border-radius: 9px; color: var(--accent); font-size: 11px; font-weight: 750; }
 .storage {
   margin: 4px 4px 8px;
   padding: 12px;
@@ -219,7 +230,7 @@ onUnmounted(() => {
     border-right: none; border-top: 1px solid var(--border);
     order: 2; padding: 6px 8px; gap: 4px; overflow-x: auto;
   }
-  .sidebar-label { display: none; }
+  .sidebar-brand, .nav-label, .sidebar-label, .upload-arrow, .account-arrow { display: none; }
   .sidebar-item { width: auto; padding: 8px; }
   .storage { display: none; }
 }

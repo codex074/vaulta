@@ -1,5 +1,6 @@
 <script setup>
 import { useThemeStore } from '../stores/theme.js'
+import UiIcon from './UiIcon.vue'
 
 const theme = useThemeStore()
 </script>
@@ -12,9 +13,9 @@ const theme = useThemeStore()
     :title="theme.current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
     @click="theme.toggleTheme()"
   >
-    <span class="icon sun">☀️</span>
+    <UiIcon class="icon sun" name="sun" :size="15" />
     <span class="track" :class="{ dark: theme.current === 'dark' }"><span class="thumb"></span></span>
-    <span class="icon moon">🌙</span>
+    <UiIcon class="icon moon" name="moon" :size="15" />
   </button>
 </template>
 
@@ -27,7 +28,7 @@ const theme = useThemeStore()
   background: transparent;
   padding: 4px;
 }
-.icon { font-size: 12px; line-height: 1; }
+.icon { color: var(--text-muted); }
 .track {
   width: 34px;
   height: 18px;

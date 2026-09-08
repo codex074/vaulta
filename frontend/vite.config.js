@@ -25,6 +25,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         // Without this, the service worker's SPA navigation fallback
         // intercepts *any* top-level/frame navigation — including the PDF
         // preview's <iframe src="/api/resources/download?...">  — and
