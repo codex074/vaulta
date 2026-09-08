@@ -40,7 +40,7 @@ New ix Custom App on TrueNAS VM 105, docker-compose (own stack, not merged into 
 
 - Image: `onlyoffice/documentserver` (official, Community Edition — free).
 - **Bridge network** (default), publish `8095:80` — deliberately *not* `network_mode: host` (see recon above: its internal nginx is hardcoded to port 80 and would collide with TrueNAS's own UI).
-- Env: `JWT_ENABLED=true`, `JWT_SECRET=<generated once, shared with FileBrowser's config>`.
+- Env: `JWT_ENABLED=true`, `JWT_SECRET=<generated once, shared with FileBrowser's config>`, `ALLOW_PRIVATE_IP_ADDRESS=true`, `ALLOW_META_IP_ADDRESS=true` — OnlyOffice's SSRF guard rejects fetching documents from private/RFC1918 addresses by default, and `document.url` (built by FileBrowser Quantum) will point at `192.168.1.22` (see the corrected `http.internalUrl` below), a private address.
 - Persistent volumes (per OnlyOffice's own documented list, mounted under `/mnt/.ix-apps/app_mounts/onlyoffice/...` matching this deployment's existing convention): `/var/log/onlyoffice`, `/var/www/onlyoffice/Data`, `/var/lib/onlyoffice`, `/var/lib/postgresql`, `/var/lib/rabbitmq` — survives `--force-recreate` the same way `nas-webui`'s and `filebrowser-quantum`'s config/data mounts already do.
 - No resource limit set at the Docker level initially (the VM RAM bump already gives headroom); revisit if it turns out to need capping.
 
@@ -58,7 +58,7 @@ server:
       config:
         defaultEnabled: true
 http:
-  internalUrl: http://127.0.0.1:30334   # how OnlyOffice reaches FileBrowser back, bypassing the tunnel
+  internalUrl: http://192.168.1.22:30334   # how OnlyOffice reaches FileBrowser back to fetch the file — must be reachable from OnlyOffice's own bridge network, so this has to be the VM's real LAN IP, not 127.0.0.1 (that loopback belongs to the OnlyOffice container itself, not the host, since OnlyOffice runs on a bridge network — see Component 1). This was originally written as 127.0.0.1 during design and caught as wrong before implementation: every document open would have failed with a download error.
 integrations:
   office:
     url: https://office.codex074.com     # how the browser + FileBrowser reach OnlyOffice
@@ -79,14 +79,23 @@ The frontend needs to know where to load OnlyOffice's embedding script (`<url>/w
 
 ## Component 4: Frontend — `Lightbox.vue`
 
-- Fix the existing PDF path first: `downloadUrl()` gains an optional third `{inline}` param; the PDF iframe (`kind === 'pdf'`) now requests `downloadUrl(path, {inline: true})` instead of the default `attachment` disposition. Native PDF rendering keeps working exactly as before for the common case, just without the disposition bug.
-- `kind` computed gains one more branch: anything that isn't `image`/`video`/`pdf` is tentatively `office` **if** `GET /nasapi/config` returned a non-empty `onlyOfficeUrl` (fetched once, cached at app level — a tiny new `stores/onlyoffice.js` Pinia store, or a plain module-level cache; not per-Lightbox-instance).
+**Correction made before implementation:** the first draft of this section planned to hand-roll `<script src=".../api.js">` injection and call `new DocsAPI.DocEditor(elementId, config)` directly. Checking FileBrowser Quantum's own frontend source (`frontend/src/views/files/OnlyOfficeEditor.vue`, `frontend/src/api/office.js` in their repo — they ship a real, working OnlyOffice integration against this exact backend) showed they use the official `@onlyoffice/document-editor-vue` npm package (`^1.4.0`, Vue 3 compatible — matches this app's Vue 3 setup) instead: a `<DocumentEditor>` component that takes `documentServerUrl` and `config` props and handles script loading/mounting/teardown internally. This is the maintainer-sanctioned integration path against this specific backend, not a generic OnlyOffice example, so it's what this app uses too — it removes an entire hand-rolled script-loading module from the plan.
+
+One gap confirmed by reading both their backend (`onlyOffice.go`) and frontend: `/api/office/config`'s response has a `document` object but no top-level `documentType` (`"word"`/`"cell"`/`"slide"`/`"pdf"`) or `type` (`"desktop"`/`"mobile"`) field — FileBrowser Quantum's own frontend adds `type` client-side (`configData.type = isMobile ? "mobile" : "desktop"`) and does not add `documentType` at all (relying on the Document Server auto-inferring it from `document.fileType` — supported since OnlyOffice API 7.x). This app does the same: add `type` client-side, and additionally add `documentType` client-side too (via a small extension→category map, covering every extension in FileBrowser Quantum's own `onlyOfficeSupported` list, not just the 5 the user asked for) as a defensive measure in case the specific Document Server version deployed doesn't auto-infer it — supplying it explicitly is harmless either way.
+
+- Fix the existing PDF path first: `downloadUrl()` gains an optional second `{inline}` param; the PDF iframe (`kind === 'pdf'`) now requests `downloadUrl(path, {inline: true})` instead of the default `attachment` disposition. Native PDF rendering keeps working exactly as before for the common case, just without the disposition bug.
+- New dependency: `@onlyoffice/document-editor-vue@^1.4.0`.
+- `kind` computed gains one more branch: anything that isn't `image`/`video`/`pdf` is tentatively `office` **if** `GET /nasapi/config` returned a non-empty `onlyOfficeUrl` (fetched once, cached at module level — a plain cache in `src/api/config.js`, not per-Lightbox-instance).
 - Opening an `office`-kind entry:
-  1. Load the OnlyOffice embedding script once (`<script src="<onlyOfficeUrl>/web-apps/apps/api/documents/api.js">`, injected into `document.head` on first use, cached so repeat opens don't re-inject).
-  2. `GET /api/office/config?source=share&path=<path>` (existing FileBrowser Quantum endpoint, not something this repo builds).
-  3. On success: render a container div, `new DocsAPI.DocEditor(elementId, config)`.
-  4. On any failure (script load, config fetch — extension not supported, OnlyOffice unreachable, etc.): fall back to the existing `other` view (plain download link) rather than showing a broken/blank editor. This is the same graceful-degradation philosophy already used for ownership metadata (§ prior session) — a missing/misbehaving optional service never blocks the core action (viewing/downloading the file).
-- `onBeforeUnmount`: destroy the DocEditor instance if one was created (`editor.destroyEditor()`), mirroring the existing Plyr `destroy()` cleanup for video.
+  1. `GET /api/office/config?source=share&path=<path>` (existing FileBrowser Quantum endpoint, not something this repo builds).
+  2. Merge in `type` (mobile/desktop) and `documentType` (word/cell/slide/pdf, from the extension map) client-side.
+  3. Render `<DocumentEditor id="vaulta-office-editor" :document-server-url="onlyOfficeUrl" :config="mergedConfig" :on-load-component-error="..." />`.
+  4. On any failure (config fetch — extension not supported, OnlyOffice unreachable — or `onLoadComponentError`): fall back to the existing `other` view (plain download link) rather than showing a broken/blank editor. This is the same graceful-degradation philosophy already used for ownership metadata (§ prior session) — a missing/misbehaving optional service never blocks the core action (viewing/downloading the file).
+- No manual teardown needed beyond unmounting the `<DocumentEditor>` (Vue's own `v-if` handles that, mirroring how the package's own `beforeUnmount` example in FileBrowser Quantum's frontend just removes stray iframes/`window.DocsAPI` — the package manages its own lifecycle).
+
+## Troubleshooting note for rollout (SSRF guard)
+
+OnlyOffice Document Server has shipped a private-IP SSRF guard in recent versions (rejects fetching `document.url` from RFC1918 addresses unless explicitly allowed) — since `http.internalUrl` above points at `192.168.1.22` (private), the compose env vars `ALLOW_PRIVATE_IP_ADDRESS=true`/`ALLOW_META_IP_ADDRESS=true` are set proactively (Component 1). If a document still fails to open with a download/network error after everything else is wired up, `docker logs` on the OnlyOffice container is the first place to check.
 
 No change is needed to `nas-webui`'s own `nginx.conf`: `/api/office/config` and `/api/office/callback` are already covered by the existing `location /api/ { proxy_pass http://127.0.0.1:30334/api/; }` block, same as every other FileBrowser Quantum endpoint this app already calls.
 
