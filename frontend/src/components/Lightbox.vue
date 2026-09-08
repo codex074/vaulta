@@ -2,7 +2,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Plyr from 'plyr'
 import 'plyr/dist/plyr.css'
+import { DocumentEditor } from '@onlyoffice/document-editor-vue'
 import { downloadUrl, previewUrl } from '../api/resources.js'
+import { getOnlyOfficeUrl } from '../api/config.js'
+import { getOfficeConfig } from '../api/office.js'
+import { documentTypeFor } from './officeDocumentType.js'
 import { pickImageSource } from './lightboxSrc.js'
 
 const props = defineProps({ entry: { type: Object, required: true } })
@@ -19,13 +23,20 @@ onBeforeUnmount(() => {
   player?.destroy()
 })
 
+const onlyOfficeAvailable = ref(false)
+onMounted(async () => {
+  onlyOfficeAvailable.value = Boolean(await getOnlyOfficeUrl())
+})
+
 const kind = computed(() => {
   if (props.entry.type.startsWith('image/')) return 'image'
   if (props.entry.type.startsWith('video/')) return 'video'
   if (props.entry.type === 'application/pdf') return 'pdf'
+  if (onlyOfficeAvailable.value) return 'office'
   return 'other'
 })
 const src = computed(() => downloadUrl(props.entry.path))
+const pdfSrc = computed(() => downloadUrl(props.entry.path, { inline: true }))
 const imagePreviewFailed = ref(false)
 const originalLoaded = ref(false)
 const imageSrc = computed(() =>
@@ -54,6 +65,41 @@ watch(
   },
   { immediate: true }
 )
+
+const officeUrl = ref('')
+const officeConfig = ref(null)
+const officeFailed = ref(false)
+
+async function loadOffice(path, name) {
+  officeFailed.value = false
+  officeConfig.value = null
+  try {
+    const baseUrl = await getOnlyOfficeUrl()
+    if (!baseUrl) throw new Error('office viewer not configured')
+    const config = await getOfficeConfig(path)
+    const documentType = documentTypeFor(name)
+    officeUrl.value = baseUrl
+    officeConfig.value = {
+      ...config,
+      documentType,
+      type: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+    }
+  } catch {
+    officeFailed.value = true
+  }
+}
+
+watch(
+  () => [kind.value, props.entry.path],
+  ([currentKind, path]) => {
+    if (currentKind === 'office') loadOffice(path, props.entry.name)
+  },
+  { immediate: true }
+)
+
+function onOfficeLoadError() {
+  officeFailed.value = true
+}
 </script>
 
 <template>
@@ -62,7 +108,14 @@ watch(
       <button class="close" @click="$emit('close')">✕</button>
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
-      <iframe v-else-if="kind === 'pdf'" :src="src" title="PDF preview" />
+      <iframe v-else-if="kind === 'pdf'" :src="pdfSrc" title="PDF preview" />
+      <DocumentEditor
+        v-else-if="kind === 'office' && officeConfig && !officeFailed"
+        id="vaulta-office-editor"
+        :document-server-url="officeUrl"
+        :config="officeConfig"
+        :on-load-component-error="onOfficeLoadError"
+      />
       <div v-else class="fallback">
         <p>{{ entry.name }}</p>
         <a :href="src" target="_blank">Download</a>
@@ -79,6 +132,7 @@ watch(
 .frame :deep(.plyr__video-wrapper) { max-height: 75vh; }
 .frame :deep(video) { max-height: 75vh; }
 .frame iframe { width: 70vw; height: 80vh; border: none; }
+.frame :deep(#vaulta-office-editor) { width: 80vw; height: 85vh; }
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
 .fallback { text-align: center; }
 </style>
