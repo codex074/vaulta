@@ -21,9 +21,37 @@ export async function makeDirectory(source, path) {
   if (!response.ok) throw await apiError(response)
 }
 
-export function uploadFile(source, path, file, onProgress) {
+function abortError() {
+  const err = new Error('Upload cancelled')
+  err.name = 'AbortError'
+  return err
+}
+
+// `signal` (an AbortSignal) lets the caller cancel an in-flight upload: the
+// XHR is aborted and the promise rejects with an AbortError, so callers can
+// tell a deliberate cancel apart from a failure. FileBrowser writes uploads
+// as a stream, so a cancelled upload can leave a partial file behind — it is
+// the caller's job to delete it (see App.vue's cancel handling).
+export function uploadFile(source, path, file, onProgress, { signal } = {}) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError())
+      return
+    }
     const xhr = new XMLHttpRequest()
+    let settled = false
+    const finish = (fn) => (value) => {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener('abort', onAbort)
+      fn(value)
+    }
+    const onAbort = () => {
+      xhr.abort()
+      finish(reject)(abortError())
+    }
+    signal?.addEventListener('abort', onAbort)
+    xhr.onabort = () => finish(reject)(abortError())
     xhr.open('POST', resourcesUrl(source, path, { override: 'false' }), true)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
     xhr.withCredentials = true
@@ -34,7 +62,7 @@ export function uploadFile(source, path, file, onProgress) {
     }
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve()
+        finish(resolve)()
       } else {
         if (xhr.status === 401) notifyUnauthorized()
         let message = 'Upload failed'
@@ -44,10 +72,10 @@ export function uploadFile(source, path, file, onProgress) {
         } catch {
           // non-JSON response body, keep the fallback message
         }
-        reject(Object.assign(new Error(message), { status: xhr.status }))
+        finish(reject)(Object.assign(new Error(message), { status: xhr.status }))
       }
     }
-    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.onerror = () => finish(reject)(new Error('Network error during upload'))
     xhr.send(file)
   })
 }

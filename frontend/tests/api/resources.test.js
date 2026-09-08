@@ -235,4 +235,27 @@ describe('resources API', () => {
     uploadFile('home', '/test.txt', new File(['test'], 'test.txt'))
     expect(openedUrl).toContain('source=home')
   })
+
+  it('uploadFile aborts the XHR and rejects with AbortError when its signal fires', async () => {
+    const mockXhr = { open: vi.fn(), setRequestHeader: vi.fn(), send: vi.fn(), abort: vi.fn(), upload: {}, status: 0 }
+    vi.stubGlobal('XMLHttpRequest', class { constructor() { return mockXhr } })
+    const controller = new AbortController()
+    const promise = uploadFile('home', '/big.bin', new File(['x'], 'big.bin'), null, { signal: controller.signal })
+    expect(mockXhr.send).toHaveBeenCalled()
+    controller.abort()
+    expect(mockXhr.abort).toHaveBeenCalled()
+    // The browser fires onabort after xhr.abort(); simulate it.
+    if (mockXhr.onabort) mockXhr.onabort()
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError', message: 'Upload cancelled' })
+  })
+
+  it('uploadFile never sends when the signal is already aborted', async () => {
+    const mockXhr = { open: vi.fn(), setRequestHeader: vi.fn(), send: vi.fn(), abort: vi.fn(), upload: {}, status: 0 }
+    vi.stubGlobal('XMLHttpRequest', class { constructor() { return mockXhr } })
+    const controller = new AbortController()
+    controller.abort()
+    await expect(uploadFile('home', '/big.bin', new File(['x'], 'big.bin'), null, { signal: controller.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' })
+    expect(mockXhr.send).not.toHaveBeenCalled()
+  })
 })

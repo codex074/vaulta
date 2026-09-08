@@ -6,7 +6,8 @@ import { useStarredStore } from './stores/starred.js'
 import { useTrashStore } from './stores/trash.js'
 import { useQuotaStore } from './stores/quota.js'
 import { useThemeStore } from './stores/theme.js'
-import { uploadFile, makeDirectory } from './api/resources.js'
+import { uploadFile, makeDirectory, deleteItem } from './api/resources.js'
+import { createUploadEntry, cancelUpload, activeUploads } from './components/uploadQueue.js'
 import { stampOwnership } from './api/ownership.js'
 import { onUnauthorized } from './api/http.js'
 import { showError } from './errorToast.js'
@@ -127,27 +128,57 @@ async function handleFiles(items) {
       }
     }
   }
-  for (const { file, path } of items) {
-    const entry = reactive({ id: uploadId++, name: path, progress: 0, error: false, message: '' })
+  // Every file gets a tray entry up front so the user can cancel ones that
+  // are still queued (e.g. a wrong selection) before they even start.
+  const source = files.source
+  const queue = items.map(({ file, path }) => {
+    const entry = reactive(createUploadEntry(uploadId++, path))
     uploads.push(entry)
+    return { entry, file, fullPath: `${base}${path}` }
+  })
+  for (const { entry, file, fullPath } of queue) {
+    if (entry.status === 'cancelled') continue
+    entry.status = 'uploading'
     try {
-      await uploadFile(files.source, `${base}${path}`, file, (pct) => { entry.progress = pct })
-      if (files.source === 'share') {
+      await uploadFile(source, fullPath, file, (pct) => { entry.progress = pct }, { signal: entry.controller.signal })
+      entry.status = 'done'
+      if (source === 'share') {
         try {
-          await stampOwnership(`${base}${path}`)
+          await stampOwnership(fullPath)
         } catch {
           // Best-effort: ownership is UI metadata, not a security control, so a
           // failed stamp shouldn't surface as an upload failure.
         }
       }
     } catch (err) {
-      entry.error = true
-      entry.message = err.message || 'Failed'
+      if (err.name === 'AbortError') {
+        entry.status = 'cancelled'
+        entry.message = 'Cancelled'
+        // FileBrowser streams uploads straight to disk, so an aborted upload
+        // usually leaves a truncated file behind. Remove it best-effort; a
+        // 404 just means nothing had been written yet.
+        try {
+          await deleteItem(source, fullPath)
+        } catch {
+          // Nothing to clean up, or it will show in the listing for the user to handle.
+        }
+      } else {
+        entry.status = 'error'
+        entry.message = err.message || 'Failed'
+      }
     }
   }
   await files.loadDirectory(files.currentPath)
   quota.refresh().catch(() => {})
   setTimeout(() => uploads.splice(0, uploads.length), 2000)
+}
+
+function onCancelUpload(entry) {
+  cancelUpload(entry)
+}
+
+function onCancelAllUploads() {
+  for (const entry of activeUploads(uploads)) cancelUpload(entry)
 }
 
 async function onDrop(event) {
@@ -238,7 +269,7 @@ async function onEmptyTrash() {
       </div>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />
-    <UploadToast :uploads="uploads" />
+    <UploadToast :uploads="uploads" @cancel="onCancelUpload" @cancel-all="onCancelAllUploads" />
     <ErrorToast />
     <ContextMenu
       v-if="activeMenu"
