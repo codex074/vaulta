@@ -44,12 +44,11 @@ function basename(path) {
   return idx === -1 ? path : path.slice(idx + 1)
 }
 
-// TODO(D6): flip to moveInto(source, draggedPaths, targetPath) with source
-// required (no default) once every call site threads its own entry.source
-// through, per the private-drives-quota plan's D6 task. Defaulting to
-// 'share' here for now keeps this file's own behavior (and its tests)
-// unchanged until that call-site rewiring lands.
-export async function moveInto(draggedPaths, targetPath, source = 'share') {
+// Drag-and-drop only ever moves items within the drive currently being
+// browsed (cross-drive moves go through ContextMenu's "Copy to My
+// Drive"/"Copy to Shared" instead), so every dragged path and the drop
+// target share this one source.
+export async function moveInto(source, draggedPaths, targetPath) {
   const base = targetPath === '/' ? '' : targetPath
   const failed = []
   for (const path of draggedPaths) {

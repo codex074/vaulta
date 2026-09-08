@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { useStarredStore } from './stores/starred.js'
 import { useTrashStore } from './stores/trash.js'
+import { useQuotaStore } from './stores/quota.js'
 import { useThemeStore } from './stores/theme.js'
 import { uploadFile, makeDirectory } from './api/resources.js'
 import { stampOwnership } from './api/ownership.js'
@@ -26,6 +27,7 @@ const auth = useAuthStore()
 const files = useFilesStore()
 const starred = useStarredStore()
 const trash = useTrashStore()
+const quota = useQuotaStore()
 const theme = useThemeStore()
 watch(() => theme.current, (value) => { document.documentElement.dataset.theme = value }, { immediate: true })
 const showNewFolder = ref(false)
@@ -57,19 +59,25 @@ function onFileInputChange(event) {
 onMounted(() => auth.checkSession())
 watch(() => auth.user, (user) => {
   if (user) {
-    files.loadDirectory('/').catch((err) => showError(err.message || 'Could not load files.'))
+    files.switchDrive(auth.hasHomeDrive ? 'home' : 'share')
+      .catch((err) => showError(err.message || 'Could not load files.'))
   }
 })
 
 onUnauthorized(() => { auth.user = null })
 
 async function onNavigate(nextView) {
-  view.value = nextView
   searchQuery.value = ''
   files.clearSelection()
   try {
-    if (nextView === 'starred') await starred.loadStarred()
-    else if (nextView === 'trash') await trash.loadTrash()
+    if (nextView === 'home' || nextView === 'share') {
+      view.value = 'browse'
+      await files.switchDrive(nextView)
+    } else {
+      view.value = nextView
+      if (nextView === 'starred') await starred.loadStarred()
+      else if (nextView === 'trash') await trash.loadTrash()
+    }
   } catch (err) {
     showError(err.message || 'Could not load.')
   }
@@ -82,35 +90,55 @@ async function onEntryChanged() {
   } catch (err) {
     showError(err.message || 'Could not refresh.')
   }
+  quota.refresh().catch(() => {})
 }
 
 async function handleFiles(items) {
+  // First layer of defense: skip the whole batch up front when it's
+  // obviously over quota, so the user isn't left watching every file in a
+  // batch fail one by one. The 413 a rejected upload gets back from
+  // nasapi (surfaced via uploadFile's own message parsing) is the real,
+  // server-side second layer — this is just a courtesy.
+  if (files.source === 'home' && quota.loaded && !quota.unlimited) {
+    const totalSize = items.reduce((sum, item) => sum + (item.file?.size || 0), 0)
+    const remaining = Math.max(0, quota.limitBytes - quota.usedBytes)
+    if (totalSize > remaining) {
+      showError('Storage quota exceeded: not enough space left in My Drive for this upload.')
+      return
+    }
+  }
+
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
   for (const dir of directoriesFor(items.map((item) => item.path))) {
     const dirPath = `${base}${dir}`
     try {
-      await makeDirectory(dirPath)
+      await makeDirectory(files.source, dirPath)
     } catch {
       // Likely already exists (e.g. a sibling file created the same parent) — the
       // upload below will surface a real problem with this directory on its own.
       continue
     }
-    try {
-      await stampOwnership(dirPath)
-    } catch {
-      // Best-effort: ownership is UI metadata, not a security control.
+    // Ownership tracking stays share-only (see design spec's Non-Goals).
+    if (files.source === 'share') {
+      try {
+        await stampOwnership(dirPath)
+      } catch {
+        // Best-effort: ownership is UI metadata, not a security control.
+      }
     }
   }
   for (const { file, path } of items) {
     const entry = reactive({ id: uploadId++, name: path, progress: 0, error: false, message: '' })
     uploads.push(entry)
     try {
-      await uploadFile(`${base}${path}`, file, (pct) => { entry.progress = pct })
-      try {
-        await stampOwnership(`${base}${path}`)
-      } catch {
-        // Best-effort: ownership is UI metadata, not a security control, so a
-        // failed stamp shouldn't surface as an upload failure.
+      await uploadFile(files.source, `${base}${path}`, file, (pct) => { entry.progress = pct })
+      if (files.source === 'share') {
+        try {
+          await stampOwnership(`${base}${path}`)
+        } catch {
+          // Best-effort: ownership is UI metadata, not a security control, so a
+          // failed stamp shouldn't surface as an upload failure.
+        }
       }
     } catch (err) {
       entry.error = true
@@ -118,6 +146,7 @@ async function handleFiles(items) {
     }
   }
   await files.loadDirectory(files.currentPath)
+  quota.refresh().catch(() => {})
   setTimeout(() => uploads.splice(0, uploads.length), 2000)
 }
 
@@ -131,7 +160,7 @@ const bulkError = ref('')
 async function onBulkDelete() {
   bulkError.value = ''
   const sourceEntries = view.value === 'starred' ? starred.entries : view.value === 'trash' ? trash.entries : files.entries
-  const { allowed, blocked } = partitionDeletable(sourceEntries, files.selected, auth.user, files.currentPath)
+  const { allowed, blocked } = partitionDeletable(sourceEntries, files.selected, auth.user, files.currentPath, files.source)
   try {
     if (view.value === 'trash') {
       for (const item of allowed) {
@@ -139,7 +168,7 @@ async function onBulkDelete() {
       }
       files.clearSelection()
     } else {
-      await files.deleteSelected(allowed.map((e) => e.path))
+      await files.deleteSelected(allowed)
       if (view.value === 'starred') await starred.loadStarred()
       else await files.loadDirectory(files.currentPath)
     }
@@ -149,6 +178,7 @@ async function onBulkDelete() {
   } catch (err) {
     bulkError.value = err.message || 'Some items could not be deleted.'
   }
+  quota.refresh().catch(() => {})
 }
 
 async function onEmptyTrash() {
@@ -157,6 +187,7 @@ async function onEmptyTrash() {
   } catch (err) {
     showError(err.message || 'Could not empty trash.')
   }
+  quota.refresh().catch(() => {})
 }
 </script>
 

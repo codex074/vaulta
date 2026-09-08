@@ -109,18 +109,25 @@ describe('moveInto', () => {
     global.fetch = vi.fn()
   })
 
-  it('moves each dragged path under the target directory', async () => {
+  it('moves each dragged path under the target directory, on the given source', async () => {
     global.fetch.mockResolvedValue({ ok: true, status: 200 })
-    await moveInto(['/Photos/a.jpg', '/Photos/b.jpg'], '/Archive')
+    await moveInto('share', ['/Photos/a.jpg', '/Photos/b.jpg'], '/Archive')
     expect(global.fetch).toHaveBeenCalledTimes(2)
     const bodies = global.fetch.mock.calls.map(([, opts]) => JSON.parse(opts.body))
-    expect(bodies[0].items[0]).toMatchObject({ fromPath: '/Photos/a.jpg', toPath: '/Archive/a.jpg' })
-    expect(bodies[1].items[0]).toMatchObject({ fromPath: '/Photos/b.jpg', toPath: '/Archive/b.jpg' })
+    expect(bodies[0].items[0]).toMatchObject({ fromSource: 'share', fromPath: '/Photos/a.jpg', toSource: 'share', toPath: '/Archive/a.jpg' })
+    expect(bodies[1].items[0]).toMatchObject({ fromSource: 'share', fromPath: '/Photos/b.jpg', toSource: 'share', toPath: '/Archive/b.jpg' })
+  })
+
+  it('moves within the home source when given source=home', async () => {
+    global.fetch.mockResolvedValue({ ok: true, status: 200 })
+    await moveInto('home', ['/a.jpg'], '/Archive')
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+    expect(body.items[0]).toMatchObject({ fromSource: 'home', toSource: 'home' })
   })
 
   it('moves into the root directory without a doubled slash', async () => {
     global.fetch.mockResolvedValue({ ok: true, status: 200 })
-    await moveInto(['/Photos/a.jpg'], '/')
+    await moveInto('share', ['/Photos/a.jpg'], '/')
     const [, opts] = global.fetch.mock.calls[0]
     expect(JSON.parse(opts.body).items[0].toPath).toBe('/a.jpg')
   })
@@ -129,7 +136,7 @@ describe('moveInto', () => {
     global.fetch
       .mockResolvedValueOnce({ ok: false, status: 409, statusText: 'Conflict', clone: () => ({ json: () => Promise.resolve({}) }) })
       .mockResolvedValueOnce({ ok: true, status: 200 })
-    await expect(moveInto(['/a.jpg', '/b.jpg'], '/Archive')).rejects.toThrow('/a.jpg')
+    await expect(moveInto('share', ['/a.jpg', '/b.jpg'], '/Archive')).rejects.toThrow('/a.jpg')
     expect(global.fetch).toHaveBeenCalledTimes(2)
   })
 })

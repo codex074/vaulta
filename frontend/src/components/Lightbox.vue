@@ -11,6 +11,11 @@ import { pickImageSource } from './lightboxSrc.js'
 const props = defineProps({ entry: { type: Object, required: true } })
 defineEmits(['close'])
 
+// Callers (FileTile/FileListView) always stamp the entry with its own
+// source before emitting 'open'; the fallback keeps this component usable
+// on its own without pulling in the files store.
+const source = computed(() => props.entry.source ?? 'share')
+
 // Deferred: most Lightbox opens are images/video, and this package (~85KB
 // gzipped, lodash inlined) would otherwise ship in the main bundle for
 // every visitor even if they never open a document.
@@ -41,8 +46,8 @@ const kind = computed(() => {
   if (onlyOfficeAvailable.value && documentTypeFor(props.entry.name)) return 'office'
   return 'other'
 })
-const src = computed(() => downloadUrl(props.entry.path))
-const pdfSrc = computed(() => downloadUrl(props.entry.path, { inline: true }))
+const src = computed(() => downloadUrl(source.value, props.entry.path))
+const pdfSrc = computed(() => downloadUrl(source.value, props.entry.path, { inline: true }))
 const imagePreviewFailed = ref(false)
 const originalLoaded = ref(false)
 const imageSrc = computed(() =>
@@ -51,7 +56,7 @@ const imageSrc = computed(() =>
     previewFailed: imagePreviewFailed.value,
     originalLoaded: originalLoaded.value,
   }) === 'preview'
-    ? previewUrl(props.entry.path, 'large')
+    ? previewUrl(source.value, props.entry.path, 'large')
     : src.value
 )
 
@@ -67,7 +72,7 @@ watch(
     original.onload = () => {
       if (props.entry.path === path) originalLoaded.value = true
     }
-    original.src = downloadUrl(path)
+    original.src = downloadUrl(source.value, path)
   },
   { immediate: true }
 )
@@ -82,7 +87,7 @@ async function loadOffice(path, name) {
   try {
     const baseUrl = await getOnlyOfficeUrl()
     if (!baseUrl) throw new Error('office viewer not configured')
-    const config = await getOfficeConfig(path)
+    const config = await getOfficeConfig(source.value, path)
     const documentType = documentTypeFor(name)
     officeUrl.value = baseUrl
     officeConfig.value = {

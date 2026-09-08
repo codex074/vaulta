@@ -110,14 +110,14 @@ describe('files store', () => {
     expect(store.currentPath).toBe('/')
   })
 
-  it('deleteSelected calls softDelete with the store\'s current source for each selected path by default', async () => {
+  it('deleteSelected calls softDelete for each selected key by default, parsed back into {source,path}', async () => {
     trash.softDelete.mockResolvedValue(undefined)
     const store = useFilesStore()
-    store.toggleSelect('/a.jpg')
-    store.toggleSelect('/b.jpg')
+    store.toggleSelect('share:/a.jpg')
+    store.toggleSelect('home:/b.jpg')
     await store.deleteSelected()
     expect(trash.softDelete).toHaveBeenCalledWith('share', '/a.jpg')
-    expect(trash.softDelete).toHaveBeenCalledWith('share', '/b.jpg')
+    expect(trash.softDelete).toHaveBeenCalledWith('home', '/b.jpg')
     expect(store.selected.size).toBe(0)
   })
 
@@ -134,7 +134,7 @@ describe('files store', () => {
       path === '/bad.jpg' ? Promise.reject(new Error('boom')) : Promise.resolve()
     )
     const store = useFilesStore()
-    store.toggleSelect('/bad.jpg')
+    store.toggleSelect('share:/bad.jpg')
     await expect(store.deleteSelected()).rejects.toThrow('/bad.jpg')
     expect(store.selected.size).toBe(0)
   })

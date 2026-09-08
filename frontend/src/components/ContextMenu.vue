@@ -1,9 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { renameItem, moveItem, downloadUrl } from '../api/resources.js'
+import { renameItem, moveItem, downloadUrl, transferItem } from '../api/resources.js'
 import { softDelete } from '../api/trash.js'
+import { useFilesStore } from '../stores/files.js'
 import { useTrashStore } from '../stores/trash.js'
 import { useAuthStore } from '../stores/auth.js'
+import { useQuotaStore } from '../stores/quota.js'
 import { canDeleteEntry } from '../permissions.js'
 import { showError } from '../errorToast.js'
 
@@ -13,13 +15,28 @@ const props = defineProps({
   view: { type: String, default: 'browse' },
 })
 const emit = defineEmits(['close', 'changed'])
+const files = useFilesStore()
 const trash = useTrashStore()
 const auth = useAuthStore()
+const quota = useQuotaStore()
 const canDelete = computed(() => canDeleteEntry(props.entry, auth.user))
 const renaming = ref(false)
 const moving = ref(false)
 const newName = ref(props.entry.name)
 const destination = ref('')
+
+const source = computed(() => props.entry.source ?? files.source)
+const otherSource = computed(() => (source.value === 'home' ? 'share' : 'home'))
+const copyLabel = computed(() => (otherSource.value === 'home' ? 'Copy to My Drive' : 'Copy to Shared'))
+// Cross-drive copy only makes sense once the user has a private drive at
+// all, and only outside the trash view (trash items are already source-
+// bound to where they were deleted from).
+const showCopyToOther = computed(() => props.view !== 'trash' && auth.hasHomeDrive)
+
+function basename(path) {
+  const idx = path.lastIndexOf('/')
+  return idx === -1 ? path : path.slice(idx + 1)
+}
 
 async function refreshAfter(action) {
   try {
@@ -30,16 +47,25 @@ async function refreshAfter(action) {
   }
   emit('close')
   emit('changed')
+  quota.refresh().catch(() => {})
 }
 
 function doRename() {
-  return refreshAfter(() => renameItem(props.path, newName.value))
+  return refreshAfter(() => renameItem(source.value, props.path, newName.value))
 }
 function doMove() {
-  return refreshAfter(() => moveItem(props.path, destination.value))
+  return refreshAfter(() => moveItem(source.value, props.path, destination.value))
+}
+function doCopyToOther() {
+  return refreshAfter(() => transferItem({
+    fromSource: source.value,
+    fromPath: props.path,
+    toSource: otherSource.value,
+    toPath: `/${basename(props.path)}`,
+  }, 'copy'))
 }
 function doDelete() {
-  return refreshAfter(() => softDelete(props.path))
+  return refreshAfter(() => softDelete(source.value, props.path))
 }
 function doRestore() {
   return refreshAfter(() => trash.restore(props.entry))
@@ -68,7 +94,8 @@ function doDeleteForever() {
       <template v-else>
         <button @click="renaming = true">Rename</button>
         <button @click="moving = true">Move</button>
-        <a :href="downloadUrl(path)" target="_blank" rel="noopener noreferrer">Download</a>
+        <button v-if="showCopyToOther" @click="doCopyToOther">{{ copyLabel }}</button>
+        <a :href="downloadUrl(source, path)" target="_blank" rel="noopener noreferrer">Download</a>
         <button v-if="canDelete" class="danger" @click="doDelete">Delete</button>
         <span v-else class="hint">Only {{ entry.uploadedByUsername }} or an admin can delete this</span>
       </template>

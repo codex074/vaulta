@@ -10,7 +10,7 @@ defineEmits(['open', 'menu', 'changed'])
   <div class="grid">
     <FileTile
       v-for="entry in entries"
-      :key="entry.path || entry.name"
+      :key="`${entry.source || ''}:${entry.path || entry.name}`"
       :entry="entry"
       :disable-open="disableOpen"
       @open="$emit('open', $event)"

@@ -16,16 +16,19 @@ async function onSubmit() {
   const base = files.currentPath.endsWith('/') ? files.currentPath : `${files.currentPath}/`
   const folderPath = `${base}${name.value.trim()}`
   try {
-    await makeDirectory(folderPath)
+    await makeDirectory(files.source, folderPath)
   } catch (err) {
     showError(err.message || 'Could not create folder.')
     submitting.value = false
     return
   }
-  try {
-    await stampOwnership(folderPath)
-  } catch {
-    // Best-effort: ownership is UI metadata, not a security control.
+  // Ownership tracking stays share-only (see design spec's Non-Goals).
+  if (files.source === 'share') {
+    try {
+      await stampOwnership(folderPath)
+    } catch {
+      // Best-effort: ownership is UI metadata, not a security control.
+    }
   }
   emit('close')
   try {

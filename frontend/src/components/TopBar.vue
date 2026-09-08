@@ -25,7 +25,8 @@ function onToggleSelectAll() {
 
 const crumbs = computed(() => {
   const parts = files.currentPath.split('/').filter(Boolean)
-  const result = [{ label: 'Home', path: '/' }]
+  const rootLabel = files.source === 'home' ? 'My Drive' : 'Shared'
+  const result = [{ label: rootLabel, path: '/' }]
   let acc = ''
   for (const part of parts) {
     acc += `/${part}`
@@ -58,7 +59,7 @@ async function onDrop(event, path) {
   event.preventDefault()
   event.stopPropagation()
   try {
-    await moveInto(paths, path)
+    await moveInto(files.source, paths, path)
     if (isWithin(files.currentPath, path)) {
       await files.loadDirectory(files.currentPath)
     }

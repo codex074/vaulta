@@ -3,6 +3,7 @@ import { listDirectory } from '../api/resources.js'
 import { togglePinned } from '../api/pinned.js'
 import { softDelete } from '../api/trash.js'
 import { lookupOwnership } from '../api/ownership.js'
+import { parseSelectionKey } from '../components/pathHelpers.js'
 import { useStarredStore } from './starred.js'
 
 const VIEW_MODE_KEY = 'nas-view-mode'
@@ -95,7 +96,7 @@ export const useFilesStore = defineStore('files', {
         )
       }
     },
-    async deleteSelected(items = Array.from(this.selected).map((path) => ({ source: this.source, path }))) {
+    async deleteSelected(items = Array.from(this.selected).map(parseSelectionKey)) {
       const failed = []
       for (const item of items) {
         try {

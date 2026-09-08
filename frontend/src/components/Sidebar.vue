@@ -1,8 +1,11 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
+import { useFilesStore } from '../stores/files.js'
+import { useQuotaStore } from '../stores/quota.js'
 import { getStorageUsage } from '../api/storage.js'
 import { formatSize } from './fileFormat.js'
+import { quotaPercent, quotaFillColor, quotaLabel } from './quotaMath.js'
 import AccountSettingsDialog from './AccountSettingsDialog.vue'
 import ManageUsersDialog from './ManageUsersDialog.vue'
 import VaultaBrand from './VaultaBrand.vue'
@@ -11,6 +14,8 @@ import UiIcon from './UiIcon.vue'
 defineProps({ view: { type: String, required: true } })
 const emit = defineEmits(['upload', 'navigate'])
 const auth = useAuthStore()
+const files = useFilesStore()
+const quota = useQuotaStore()
 const showAccountMenu = ref(false)
 const showAccountSettings = ref(false)
 const showManageUsers = ref(false)
@@ -26,6 +31,11 @@ function openManageUsers() {
   showManageUsers.value = true
 }
 
+// Non-admins with a private drive see their own quota usage here; everyone
+// else (admins, and anyone without a drive yet) sees the whole-disk stats
+// this card has always shown.
+const showQuota = computed(() => !auth.isAdmin && auth.hasHomeDrive)
+
 const usedBytes = ref(0)
 const totalBytes = ref(0)
 const storageError = ref(false)
@@ -39,6 +49,10 @@ const fillColor = computed(() => {
   return 'var(--accent)'
 })
 
+const quotaPct = computed(() => quotaPercent(quota.usedBytes, quota.limitBytes))
+const quotaColor = computed(() => quotaFillColor(quotaPct.value))
+const quotaText = computed(() => quotaLabel(quota))
+
 let intervalId = null
 async function refreshStorage() {
   try {
@@ -50,10 +64,13 @@ async function refreshStorage() {
     storageError.value = true
   }
 }
+async function refreshAll() {
+  await Promise.all([refreshStorage(), quota.refresh().catch(() => {})])
+}
 
 onMounted(() => {
-  refreshStorage()
-  intervalId = setInterval(refreshStorage, 60000)
+  refreshAll()
+  intervalId = setInterval(refreshAll, 60000)
 })
 onUnmounted(() => {
   if (intervalId) clearInterval(intervalId)
@@ -64,9 +81,19 @@ onUnmounted(() => {
   <nav class="sidebar" aria-label="Primary navigation">
     <VaultaBrand class="sidebar-brand" />
     <p class="nav-label">Workspace</p>
-    <button class="sidebar-item" :class="{ active: view === 'browse' }" @click="emit('navigate', 'browse')">
+    <button
+      class="sidebar-item"
+      :class="{ active: view === 'browse' && files.source === 'home' }"
+      :disabled="!auth.hasHomeDrive"
+      :title="auth.hasHomeDrive ? '' : 'Ask an admin to assign you a private drive'"
+      @click="emit('navigate', 'home')"
+    >
       <span class="sidebar-icon"><UiIcon name="home" /></span>
-      <span class="sidebar-label">Home</span>
+      <span class="sidebar-label">My Drive</span>
+    </button>
+    <button class="sidebar-item" :class="{ active: view === 'browse' && files.source === 'share' }" @click="emit('navigate', 'share')">
+      <span class="sidebar-icon"><UiIcon name="storage" /></span>
+      <span class="sidebar-label">Shared</span>
     </button>
     <button class="sidebar-item" :class="{ active: view === 'starred' }" @click="emit('navigate', 'starred')">
       <span class="sidebar-icon"><UiIcon name="starred" /></span>
@@ -82,7 +109,15 @@ onUnmounted(() => {
       <UiIcon class="upload-arrow" name="chevron" :size="15" />
     </button>
     <div class="sidebar-spacer"></div>
-    <div v-if="!storageError" class="storage">
+    <div v-if="showQuota" class="storage">
+      <div class="storage-header">
+        <span class="storage-icon"><UiIcon name="storage" :size="16" /></span>
+        <span>My Drive</span>
+      </div>
+      <div v-if="quota.limitBytes" class="storage-bar"><div class="storage-fill" :style="{ width: quotaPct + '%', background: quotaColor }"></div></div>
+      <div class="storage-label">{{ quotaText }}</div>
+    </div>
+    <div v-else-if="!storageError" class="storage">
       <div class="storage-header">
         <span class="storage-icon"><UiIcon name="storage" :size="16" /></span>
         <span>Storage</span>
@@ -146,6 +181,8 @@ onUnmounted(() => {
 .sidebar-item:hover { background: var(--bg); }
 .sidebar-item.active { background: var(--border); font-weight: 600; }
 .sidebar-item.active:hover { background: var(--border); }
+.sidebar-item:disabled { color: var(--text-muted); cursor: not-allowed; opacity: .55; }
+.sidebar-item:disabled:hover { background: transparent; }
 .sidebar-icon { display: grid; width: 24px; place-items: center; flex-shrink: 0; }
 .sidebar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .upload-arrow, .account-arrow { margin-left: auto; opacity: .45; }

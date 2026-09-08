@@ -5,7 +5,7 @@ import { formatSize, formatRelativeTime, iconFor } from './fileFormat.js'
 import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
-import { selectionKey } from './pathHelpers.js'
+import { selectionKey, parseSelectionKey } from './pathHelpers.js'
 
 const failedThumbs = reactive(new Set())
 
@@ -21,6 +21,9 @@ const dropTargetPath = ref(null)
 function fullPath(entry) {
   return entry.path || `${files.currentPath}${files.currentPath.endsWith('/') ? '' : '/'}${entry.name}`
 }
+function entrySource(entry) {
+  return entry.source ?? files.source
+}
 function selKey(entry) {
   return selectionKey(entry, files.currentPath, files.source)
 }
@@ -35,12 +38,16 @@ async function onClick(entry) {
   if (props.disableOpen) return
   if (entry.type === 'directory') {
     try {
+      // A folder from a foreign drive (e.g. reached via Starred, which
+      // aggregates both) switches the browsed drive so its own contents
+      // resolve against the right source.
+      if (entry.source && entry.source !== files.source) files.source = entry.source
       await files.loadDirectory(fullPath(entry))
     } catch (err) {
       showError(err.message || 'Could not open folder.')
     }
   } else {
-    emit('open', { ...entry, path: fullPath(entry) })
+    emit('open', { ...entry, path: fullPath(entry), source: entrySource(entry) })
   }
 }
 async function onStarClick(entry) {
@@ -51,9 +58,22 @@ async function onStarClick(entry) {
   }
 }
 
+// Drag-and-drop only ever moves items within one drive (see dragMove.js's
+// moveInto), so a multi-item drag only carries along the rest of the
+// selection that shares this item's own source — a selection spanning two
+// drives (possible in the aggregated Starred view) degrades to dragging
+// just this one item rather than silently mixing sources.
+function samePathsForSource(source) {
+  return new Set(
+    Array.from(files.selected)
+      .map(parseSelectionKey)
+      .filter((k) => k.source === source)
+      .map((k) => k.path)
+  )
+}
 function onDragStart(event, entry) {
   const path = fullPath(entry)
-  beginDrag(event, selectionToDrag(path, files.selected))
+  beginDrag(event, selectionToDrag(path, samePathsForSource(entrySource(entry))))
   draggingPath.value = path
 }
 function onDragEnd() {
@@ -77,7 +97,7 @@ async function onDrop(event, entry) {
   event.preventDefault()
   event.stopPropagation()
   try {
-    await moveInto(paths, target)
+    await moveInto(entrySource(entry), paths, target)
     emit('changed')
   } catch (err) {
     showError(err.message || 'Could not move.')
@@ -103,7 +123,7 @@ async function onDrop(event, entry) {
     <tbody>
       <tr
         v-for="entry in entries"
-        :key="entry.path || entry.name"
+        :key="`${entry.source || files.source}:${entry.path || entry.name}`"
         :class="{ dragging: draggingPath === fullPath(entry), 'drop-target': dropTargetPath === fullPath(entry) }"
         :draggable="!disableOpen"
         @dragstart="onDragStart($event, entry)"
@@ -128,7 +148,7 @@ async function onDrop(event, entry) {
           <span v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))" class="row-thumb-wrap">
             <img
               class="row-thumb"
-              :src="previewUrl(fullPath(entry), 'small')"
+              :src="previewUrl(entrySource(entry), fullPath(entry), 'small')"
               :alt="entry.name"
               loading="lazy"
               @error="failedThumbs.add(fullPath(entry))"
@@ -141,7 +161,7 @@ async function onDrop(event, entry) {
         <td>{{ entry.type === 'directory' ? '—' : formatSize(entry.size) }}</td>
         <td>{{ entry.deletedAt ? `deleted ${formatRelativeTime(entry.deletedAt)}` : formatRelativeTime(entry.modified) }}</td>
         <td class="uploader-col">{{ entry.uploadedByUsername || '—' }}</td>
-        <td><button @click.stop="emit('menu', { entry, path: fullPath(entry) })">⋮</button></td>
+        <td><button @click.stop="emit('menu', { entry: { ...entry, source: entrySource(entry) }, path: fullPath(entry) })">⋮</button></td>
       </tr>
     </tbody>
   </table>
