@@ -14,26 +14,34 @@ export function metaPathFor(trashPath) {
   return `${trashPath}.trashmeta`
 }
 
-export async function softDelete(originalPath) {
+export async function softDelete(source, originalPath) {
   const ts = Date.now()
   const trashPath = trashPathFor(originalPath, ts)
   try {
-    await makeDirectory('/.trash')
+    await makeDirectory(source, '/.trash')
   } catch (err) {
     if (err.status !== 409) throw err
   }
-  await moveItem(originalPath, trashPath)
+  await moveItem(source, originalPath, trashPath)
   try {
     const meta = { originalPath, deletedAt: ts }
     const blob = new Blob([JSON.stringify(meta)], { type: 'application/json' })
-    await uploadFile(metaPathFor(trashPath), blob)
+    await uploadFile(source, metaPathFor(trashPath), blob)
   } catch (err) {
     throw new Error(`Moved to trash, but couldn't save its restore info: ${err.message}`)
   }
 }
 
-export async function listTrash() {
-  const result = await listDirectory('/.trash')
+export async function listTrash(source) {
+  let result
+  try {
+    result = await listDirectory(source, '/.trash')
+  } catch (err) {
+    // No .trash folder yet on this drive — treat as an empty trash rather
+    // than surfacing an error the user can't act on.
+    if (err.status === 404) return []
+    throw err
+  }
   const allEntries = [...(result.folders || []), ...(result.files || [])]
   const metaNames = new Set(allEntries.filter((e) => e.name.endsWith('.trashmeta')).map((e) => e.name))
   const itemEntries = allEntries.filter((e) => !e.name.endsWith('.trashmeta'))
@@ -46,7 +54,7 @@ export async function listTrash() {
     let deletedAt = null
     if (hasMeta) {
       try {
-        const text = await getFileText(metaPathFor(trashPath))
+        const text = await getFileText(source, metaPathFor(trashPath))
         const parsed = JSON.parse(text)
         originalPath = parsed.originalPath
         deletedAt = parsed.deletedAt
@@ -56,8 +64,11 @@ export async function listTrash() {
       }
     }
     const displayName = entry.name.replace(/^\d+__/, '')
-    items.push({ ...entry, path: trashPath, trashPath, originalPath, deletedAt, hasMeta, displayName })
+    items.push({ ...entry, source, path: trashPath, trashPath, originalPath, deletedAt, hasMeta, displayName })
   }
+  // Ownership tracking stays share-only (see design spec's Non-Goals) — a
+  // user's home drive has no other viewer to attribute uploads to.
+  if (source !== 'share') return items
   const records = (await lookupOwnership(items.map((item) => item.trashPath))) || {}
   return items.map((item) => {
     const record = records[item.trashPath]
@@ -69,38 +80,40 @@ export async function listTrash() {
 
 export async function restoreFromTrash(item) {
   if (!item.originalPath) throw new Error('Missing restore information for this item.')
-  await moveItem(item.trashPath, item.originalPath)
+  await moveItem(item.source, item.trashPath, item.originalPath)
   try {
-    await deleteItem(metaPathFor(item.trashPath))
+    await deleteItem(item.source, metaPathFor(item.trashPath))
   } catch (err) {
     throw new Error(`Restored, but couldn't remove its trash record: ${err.message}`)
   }
 }
 
 export async function deleteForever(item) {
-  await deleteItem(item.trashPath)
-  try {
-    await deleteOwnership(item.trashPath)
-  } catch {
-    // Best-effort, see softDelete.
+  await deleteItem(item.source, item.trashPath)
+  if (item.source === 'share') {
+    try {
+      await deleteOwnership(item.trashPath)
+    } catch {
+      // Best-effort, see softDelete.
+    }
   }
   if (!item.hasMeta) return
   try {
-    await deleteItem(metaPathFor(item.trashPath))
+    await deleteItem(item.source, metaPathFor(item.trashPath))
   } catch (err) {
     throw new Error(`Deleted, but couldn't remove its trash record: ${err.message}`)
   }
 }
 
-export async function emptyTrash(canDelete = () => true) {
-  const result = await listDirectory('/.trash')
+export async function emptyTrash(source, canDelete = () => true) {
+  const result = await listDirectory(source, '/.trash')
   const allEntries = [...(result.folders || []), ...(result.files || [])]
   const itemNames = new Set(allEntries.filter((e) => !e.name.endsWith('.trashmeta')).map((e) => e.name))
   const orphanMetaPaths = allEntries
     .filter((e) => e.name.endsWith('.trashmeta') && !itemNames.has(e.name.slice(0, -'.trashmeta'.length)))
     .map((e) => `/.trash/${e.name}`)
 
-  const items = await listTrash()
+  const items = await listTrash(source)
   const failed = []
   for (const item of items) {
     if (!canDelete(item)) continue
@@ -112,7 +125,7 @@ export async function emptyTrash(canDelete = () => true) {
   }
   for (const metaPath of orphanMetaPaths) {
     try {
-      await deleteItem(metaPath)
+      await deleteItem(source, metaPath)
     } catch (err) {
       failed.push({ path: metaPath, message: err.message })
     }
