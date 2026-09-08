@@ -111,29 +111,28 @@ function onOfficeLoadError() {
 </script>
 
 <template>
-  <div class="backdrop" @click.self="$emit('close')">
-    <div class="frame" :class="{ 'frame-office': kind === 'office' }">
-      <button
-        class="close"
-        :class="{ 'close-office': kind === 'office' }"
-        @click="$emit('close')"
-      >
-        <template v-if="kind === 'office'">← กลับ</template>
-        <template v-else>✕</template>
-      </button>
+  <div v-if="kind === 'office' && officeConfig && !officeFailed" class="office-panel">
+    <div class="office-topbar">
+      <button class="office-back" @click="$emit('close')">← กลับ</button>
+      <span class="office-filename">{{ entry.name }}</span>
+    </div>
+    <div class="office-frame">
+      <DocumentEditor
+        id="vaulta-office-editor"
+        :document-server-url="officeUrl"
+        :config="officeConfig"
+        :on-load-component-error="onOfficeLoadError"
+        :events_on-error="onOfficeLoadError"
+        :events_on-app-ready="() => {}"
+      />
+    </div>
+  </div>
+  <div v-else class="backdrop" @click.self="$emit('close')">
+    <div class="frame">
+      <button class="close" @click="$emit('close')">✕</button>
       <img v-if="kind === 'image'" :src="imageSrc" :alt="entry.name" @error="imagePreviewFailed = true" />
       <video v-else-if="kind === 'video'" ref="videoEl" :src="src" controls autoplay playsinline />
       <iframe v-else-if="kind === 'pdf'" :src="pdfSrc" title="PDF preview" />
-      <div v-else-if="kind === 'office' && officeConfig && !officeFailed" class="office-frame">
-        <DocumentEditor
-          id="vaulta-office-editor"
-          :document-server-url="officeUrl"
-          :config="officeConfig"
-          :on-load-component-error="onOfficeLoadError"
-          :events_on-error="onOfficeLoadError"
-          :events_on-app-ready="() => {}"
-        />
-      </div>
       <div v-else class="fallback">
         <p>{{ entry.name }}</p>
         <a :href="src" target="_blank">Download</a>
@@ -150,36 +149,48 @@ function onOfficeLoadError() {
 .frame :deep(.plyr__video-wrapper) { max-height: 75vh; }
 .frame :deep(video) { max-height: 75vh; }
 .frame iframe { width: 70vw; height: 80vh; border: none; }
-.office-frame { width: calc(80vw - 40px); height: calc(85vh - 40px); }
-.office-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
-.office-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
-.frame.frame-office {
-  max-width: 100vw;
-  max-height: 100vh;
-  max-height: 100dvh;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  padding: 0;
-  border-radius: 0;
-}
-.frame.frame-office .office-frame { width: 100%; height: 100%; }
 .close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; }
-.close-office {
-  top: 16px;
-  left: 16px;
-  right: auto;
+.fallback { text-align: center; }
+
+/* Full-screen: a slim header strip of our own above the editor, never
+   overlapping OnlyOffice's own toolbar (which spans the full top edge
+   and would otherwise sit under a floating close button). */
+.office-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+}
+.office-topbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: 999px;
+  gap: 12px;
+  padding: 8px 16px;
   background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+.office-back {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--bg);
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  z-index: 1;
 }
-.fallback { text-align: center; }
+.office-filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.office-frame { flex: 1; min-height: 0; }
+.office-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
+.office-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
 </style>
