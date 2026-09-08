@@ -255,6 +255,32 @@ Admins always get `unlimited: true`. A user with no `home` scope at all gets
    Phase F so no existing user is silently granted (or silently denied) drive access
    mid-deploy.
 
+## Deployment Notes (what actually happened, 2026-09-08)
+
+- Phase A2 worked via `midclt call app.config filebrowser-quantum` → append to
+  `storage.additional_storage` → `midclt call -j app.update filebrowser-quantum
+  '{"values": …}'` (ix_* keys stripped). ~30 s FBQ restart.
+- **Correction to the design:** the catalog app's `init` sidecar appends *every*
+  additional mount to `server.sources` as `{path, config: {defaultEnabled: true}}`
+  on each app update/start — the A3 config edit was therefore pre-empted with the
+  wrong flag, and FBQ started twice with `home` defaultEnabled, which (per the
+  Verified Facts) grants every existing user scope `/` on `home`. The entry was
+  rewritten in place to `name: home`, `defaultEnabled: false`, `private: true` and
+  FBQ restarted; the sidecar only appends when the path is absent, so the fixed
+  entry survives future restarts. Because existing non-admin users may now hold
+  `home: /`, `ManageUsersDialog` gained `driveStatus()` and a **Fix drive** action
+  (same mkdir + scope PUT as Assign drive) — Phase E must be run promptly after
+  deploy. `/mnt/tank/home` was empty throughout, so nothing was exposed.
+- The `entrypoint.sh` restart loop initially inherited `set -e` and died on the
+  first non-zero nasapi exit; caught by the C3 integration test (kill → no
+  respawn) and fixed with a `set +e` subshell. C3 also showed `/quota` walking the
+  disk instead of reading the usage tracker; fixed so the sidebar number equals the
+  number the gate judges by.
+- nasapi's `/quota` for an admin walks all of `/srv/home`; fine at this scale.
+- The FBQ admin password differs from the app's `FILEBROWSER_ADMIN_PASSWORD`
+  (changed in-app), so authenticated F2 checks need real credentials or a
+  throwaway test user created through the UI.
+
 ## Verification Checklist
 
 - `go test ./... -race` green in `docker/nasapi` (unit + concurrency tests for
