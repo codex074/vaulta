@@ -143,6 +143,15 @@ To ship a code change (build → run):
   config's `FILEBROWSER_ADMIN_PASSWORD` (that is only the seed). Authenticated
   API scripting as admin needs credentials from the human or a throwaway test
   user made through the UI.
+- **FBQ 1.5.x aborts on PDF thumbnails (upstream #2763).** Its MuPDF
+  renderer can hit an uncaught error and `exit()` the whole FBQ process
+  (`aborting process from uncaught error!` in its log), which surfaces in
+  Vaulta as a burst of `502`s on every in-flight request for ~2 s. Never
+  cached because it never completes, so it recurs on every listing. Fixed
+  upstream only in 2.x (beta as of 2026-09-09, no stable). Vaulta's
+  `canRequestThumbnail()` in `fileFormat.js` therefore never requests
+  thumbnails for pdf/xps/epub/mobi/fb2/cbz — keep that guard until FBQ is on
+  2.x. FBQ's own UI on `:30334` still triggers it.
 - **OnlyOffice editing is decided by FBQ, not by this app.** `GET
   /api/office/config` returns a JWT-signed config whose `editorConfig.mode` is
   `edit` whenever `integrations.office.viewOnly` is `false` and the user has

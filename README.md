@@ -23,7 +23,9 @@ own per-user scopes remain the security boundary.
   per-file or whole-batch cancel.
 - **Starred and Trash.** Star anything; deleted files go to a `.trash` folder
   and can be restored or deleted forever. Owner-only delete on the shared drive.
-- **Previews and editing.** Image, video (Plyr player) and PDF lightbox;
+- **Previews and editing.** Image, video (Plyr player) and PDF lightbox
+  (PDF tiles show an icon, not a thumbnail: FBQ 1.5.x can crash generating
+  PDF thumbnails, see `AGENTS.md`);
   folder covers show a 2x2 collage of the folder's own photos; `txt`/`md`/
   `csv`/`log`/`json`/`html`/`xml` open in a built-in read-only text viewer. With an
   OnlyOffice Document Server configured, `docx`/`xlsx`/`pptx` (and the other

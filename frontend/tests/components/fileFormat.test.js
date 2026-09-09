@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pickFolderPreviewPaths } from '../../src/components/fileFormat.js'
+import { canRequestThumbnail, pickFolderPreviewPaths } from '../../src/components/fileFormat.js'
 
 describe('pickFolderPreviewPaths', () => {
   it('picks up to the limit of previewable files, joined onto the base path', () => {
@@ -41,5 +41,36 @@ describe('pickFolderPreviewPaths', () => {
   it('joins correctly whether or not the base path already ends with a slash', () => {
     const result = { files: [{ name: 'a.jpg', hasPreview: true }] }
     expect(pickFolderPreviewPaths(result, '/')).toEqual(['/a.jpg'])
+  })
+})
+
+// FileBrowser Quantum 1.5.x renders PDF-family thumbnails through MuPDF,
+// which aborts the whole FBQ process on some files (upstream #2763, fixed
+// only in 2.x). Never asking for those thumbnails keeps FBQ alive.
+describe('canRequestThumbnail', () => {
+  it('refuses the document formats FileBrowser hands to MuPDF', () => {
+    for (const name of ['guide.pdf', 'GUIDE.PDF', 'book.epub', 'page.xps', 'novel.mobi', 'x.fb2', 'comic.cbz']) {
+      expect(canRequestThumbnail({ name, type: 'application/octet-stream', hasPreview: true })).toBe(false)
+    }
+  })
+
+  it('allows everything else FileBrowser marks previewable', () => {
+    expect(canRequestThumbnail({ name: 'a.jpg', type: 'image/jpeg', hasPreview: true })).toBe(true)
+    expect(canRequestThumbnail({ name: 'Photos', type: 'directory', hasPreview: true })).toBe(true)
+    expect(canRequestThumbnail({ name: 'report.docx', type: 'application/octet-stream', hasPreview: true })).toBe(true)
+  })
+
+  it('is false when FileBrowser itself offers no preview', () => {
+    expect(canRequestThumbnail({ name: 'a.jpg', type: 'image/jpeg', hasPreview: false })).toBe(false)
+  })
+})
+
+describe('pickFolderPreviewPaths and PDFs', () => {
+  it('never picks a PDF for the folder collage', () => {
+    const result = { files: [
+      { name: 'guide.pdf', hasPreview: true, type: 'application/pdf' },
+      { name: 'a.jpg', hasPreview: true, type: 'image/jpeg' },
+    ] }
+    expect(pickFolderPreviewPaths(result, '/Docs')).toEqual(['/Docs/a.jpg'])
   })
 })

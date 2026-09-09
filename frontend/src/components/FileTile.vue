@@ -3,7 +3,7 @@ import FileGlyph from './FileGlyph.vue'
 import UiIcon from './UiIcon.vue'
 import { computed, ref, watch } from 'vue'
 import { useFilesStore } from '../stores/files.js'
-import { formatSize, formatRelativeTime, pickFolderPreviewPaths } from './fileFormat.js'
+import { canRequestThumbnail, formatSize, formatRelativeTime, pickFolderPreviewPaths } from './fileFormat.js'
 import { previewUrl, listDirectory } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
@@ -72,7 +72,7 @@ async function onDrop(event) {
 
 const thumbFailed = ref(false)
 watch(fullPath, () => { thumbFailed.value = false })
-const showThumb = computed(() => props.entry.hasPreview && !thumbFailed.value)
+const showThumb = computed(() => canRequestThumbnail(props.entry) && !thumbFailed.value)
 const thumbSrc = computed(() => previewUrl(entrySource.value, fullPath.value, 'small'))
 
 // A folder's own preview is just one cover image from FileBrowser Quantum —

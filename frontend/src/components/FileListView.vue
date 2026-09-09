@@ -3,7 +3,7 @@ import FileGlyph from './FileGlyph.vue'
 import UiIcon from './UiIcon.vue'
 import { computed, ref, reactive } from 'vue'
 import { useFilesStore } from '../stores/files.js'
-import { formatSize, formatRelativeTime } from './fileFormat.js'
+import { canRequestThumbnail, formatSize, formatRelativeTime } from './fileFormat.js'
 import { previewUrl } from '../api/resources.js'
 import { showError } from '../errorToast.js'
 import { beginDrag, dragPaths, selectionToDrag, isValidDropTarget, hasDragPayload, moveInto } from './dragMove.js'
@@ -152,7 +152,7 @@ async function onDrop(event, entry) {
         </td>
         <td class="name-col">
           <button class="file-open" :aria-label="`Open ${entry.name}`" :disabled="disableOpen" @click="onClick(entry)">
-          <span v-if="entry.hasPreview && !failedThumbs.has(fullPath(entry))" class="row-thumb-wrap">
+          <span v-if="canRequestThumbnail(entry) && !failedThumbs.has(fullPath(entry))" class="row-thumb-wrap">
             <img
               class="row-thumb"
               :src="previewUrl(entrySource(entry), fullPath(entry), 'small')"
