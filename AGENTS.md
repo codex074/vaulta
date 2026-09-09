@@ -148,7 +148,7 @@ To ship a code change (build → run):
   `edit` whenever `integrations.office.viewOnly` is `false` and the user has
   `modify` (all Vaulta users do); the client cannot downgrade it. "Only office
   files are editable" is therefore enforced by `lightboxKind.js` routing
-  txt/md/csv/log/json to the built-in `<pre>` viewer so they never reach
+  txt/md/csv/log/json/html/htm/xml to the built-in `<pre>` viewer so they never reach
   OnlyOffice. Saves go Document Server → FBQ `/api/office/callback` via
   `server.internalUrl`, bypassing nginx and nasapi's quota gate (accepted
   gap). `viewOnly: false` has been live since 2026-09-09.

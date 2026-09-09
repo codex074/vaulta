@@ -11,7 +11,7 @@ describe('lightboxKindFor', () => {
   })
 
   it('shows plain-text formats in the built-in read-only viewer, never in OnlyOffice', () => {
-    for (const name of ['notes.txt', 'README.md', 'data.csv', 'app.log', 'config.json']) {
+    for (const name of ['notes.txt', 'README.md', 'data.csv', 'app.log', 'config.json', 'page.html', 'old.htm', 'feed.xml']) {
       expect(lightboxKindFor(entry(name, 'text/plain'), { onlyOfficeAvailable: true })).toBe('text')
       expect(lightboxKindFor(entry(name, 'text/plain'), { onlyOfficeAvailable: false })).toBe('text')
     }

@@ -25,7 +25,7 @@ own per-user scopes remain the security boundary.
   and can be restored or deleted forever. Owner-only delete on the shared drive.
 - **Previews and editing.** Image, video (Plyr player) and PDF lightbox;
   folder covers show a 2x2 collage of the folder's own photos; `txt`/`md`/
-  `csv`/`log`/`json` open in a built-in read-only text viewer. With an
+  `csv`/`log`/`json`/`html`/`xml` open in a built-in read-only text viewer. With an
   OnlyOffice Document Server configured, `docx`/`xlsx`/`pptx` (and the other
   Word/Cell/Slide formats OnlyOffice knows) open in OnlyOffice and can be
   edited in place; changes save automatically when the document is closed.

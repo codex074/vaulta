@@ -4,7 +4,7 @@ import { documentTypeFor } from './officeDocumentType.js'
 // FileBrowser hands OnlyOffice an edit-mode config for any format a user
 // may modify (the config is JWT-signed, so the client cannot downgrade it),
 // keeping these out of OnlyOffice is what limits editing to office files.
-const TEXT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'log', 'json'])
+const TEXT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'log', 'json', 'html', 'htm', 'xml'])
 
 function extensionOf(name) {
   const dot = name.lastIndexOf('.')

@@ -24,7 +24,7 @@ Source commit: `65b3d1f` (Office documents open editable in OnlyOffice; plain te
 
 ## Deployment
 
-Status: **deployed** by 12:40 ICT. Image `nas-webui:local`, `linux/amd64`,
+Status: **deployed** by 12:05 ICT. Image `nas-webui:local`, `linux/amd64`,
 archive MD5 `5cd348504d3a6351214d4854bb61d114` matched on Mac, pve2 and the VM.
 `docker compose -p ix-nas-webui up -d` recreated `ix-nas-webui-nas-webui-1`;
 `docker image prune -f` reclaimed the old image; tarballs removed on pve2 and
