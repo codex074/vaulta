@@ -202,6 +202,18 @@ describe('auth store', () => {
     expect(localStorage.getItem('vaulta-last-activity')).toBe('31000')
   })
 
+  it('recordActivity does not re-probe storage once checkSession has cached the result', async () => {
+    authApi.getCurrentUser.mockResolvedValue({ id: 1, username: 'u' })
+    profilesApi.getMyProfile.mockResolvedValue({})
+    localStorage.setItem('vaulta-last-activity', String(Date.now()))
+    const store = useAuthStore()
+    await store.checkSession()
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+    for (let i = 0; i < 100; i++) store.recordActivity(Date.now() + i * 1000)
+    const probeWrites = setItemSpy.mock.calls.filter(([key]) => key === 'vaulta-probe')
+    expect(probeWrites).toHaveLength(0)
+  })
+
   it('renewIfDue renews at most once per five minutes and only when signed in', async () => {
     authApi.renewToken.mockResolvedValue()
     const store = useAuthStore()

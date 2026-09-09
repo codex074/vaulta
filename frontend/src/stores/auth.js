@@ -19,21 +19,34 @@ async function loadIdentity() {
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({ user: null, checked: false, signedOutReason: '', lastRenewAt: null, lastActivity: null, remember: false }),
+  state: () => ({ user: null, checked: false, signedOutReason: '', lastRenewAt: null, lastActivity: null, remember: false, storageOk: null }),
   getters: {
     isAdmin: (state) => Boolean(state.user?.permissions?.admin),
     hasHomeDrive: (state) => Boolean(state.user?.scopes?.some((scope) => scope.name === 'home')),
   },
   actions: {
+    // storageAvailable() does a real setItem/removeItem round-trip, so it's
+    // probed once per checkSession()/signIn() and cached here rather than
+    // on every currentPrefs()/recordActivity() call — recordActivity in
+    // particular runs on every scroll/keydown and every upload progress
+    // tick, and re-probing that often would mean two synchronous
+    // localStorage writes per frame for no benefit (reachability doesn't
+    // change that fast).
+    probeStorage() {
+      this.storageOk = storageAvailable(storage())
+      return this.storageOk
+    },
     // Storage prefs are authoritative when reachable; when storage throws
     // (private mode, quota, Safari ITP purge) this in-memory mirror is the
     // fallback so idle enforcement still works for the current tab.
     currentPrefs() {
-      if (storageAvailable(storage())) return readSessionPrefs(storage())
+      const ok = this.storageOk ?? this.probeStorage()
+      if (ok) return readSessionPrefs(storage())
       return { remember: this.remember, lastActivity: this.lastActivity }
     },
     async checkSession() {
       try {
+        this.probeStorage()
         const prefs = this.currentPrefs()
         const now = Date.now()
         if (isIdleExpired(prefs, now)) {
@@ -52,7 +65,7 @@ export const useAuthStore = defineStore('auth', {
         // identity has loaded successfully — proving a session exists — do
         // we treat "no prefs at all" as expired too, rather than silently
         // re-adopting a cookie we have no activity record for.
-        const cookieWithoutPrefs = storageAvailable(storage()) && !prefs.remember && prefs.lastActivity === null
+        const cookieWithoutPrefs = this.storageOk && !prefs.remember && prefs.lastActivity === null
         if (cookieWithoutPrefs) {
           await this.idleSignOut()
           return
@@ -67,6 +80,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async signIn(username, password, { remember = false } = {}) {
       await login(username, password)
+      this.probeStorage()
       const now = Date.now()
       this.remember = remember
       this.lastActivity = now
@@ -108,7 +122,7 @@ export const useAuthStore = defineStore('auth', {
       const prefs = this.currentPrefs()
       this.lastActivity = now
       this.remember = prefs.remember
-      if (shouldWriteActivity(prefs.lastActivity, now)) writeSessionPrefs(storage(), { remember: prefs.remember, lastActivity: now })
+      if (this.storageOk && shouldWriteActivity(prefs.lastActivity, now)) writeSessionPrefs(storage(), { remember: prefs.remember, lastActivity: now })
     },
     enforceIdle(now = Date.now()) {
       if (!this.user || !isIdleExpired(this.currentPrefs(), now)) return false
