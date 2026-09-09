@@ -17,6 +17,10 @@ defineProps({ name: { type: String, required: true }, size: { type: Number, defa
       <path d="M5.1 6.4h9.8l-.7 10H5.8l-.7-10Z" />
       <path d="M3.8 6.4h12.4M7.3 6.4V3.7h5.4v2.7M8.2 9v4.7M11.8 9v4.7" />
     </g>
+    <g v-else-if="name === 'link'">
+      <path d="M8.2 11.8a3 3 0 0 0 4.2 0l2.4-2.4a3 3 0 0 0-4.2-4.2l-1 1" />
+      <path d="M11.8 8.2a3 3 0 0 0-4.2 0L5.2 10.6a3 3 0 0 0 4.2 4.2l1-1" />
+    </g>
     <g v-else-if="name === 'upload'">
       <path d="M3 13.1v3.1h14v-3.1M10 13V3.2M6.6 6.7 10 3.2l3.4 3.5" />
       <path d="M6.2 10.2h7.6" opacity=".45" />

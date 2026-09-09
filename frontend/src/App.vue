@@ -25,6 +25,7 @@ import ContextMenu from './components/ContextMenu.vue'
 import UiIcon from './components/UiIcon.vue'
 import Lightbox from './components/Lightbox.vue'
 import ShareDialog from './components/ShareDialog.vue'
+import LinksView from './components/LinksView.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
@@ -265,32 +266,35 @@ async function onEmptyTrash() {
         <span v-if="bulkError" class="bulk-error">{{ bulkError }}</span>
       </div>
       <main class="content" :aria-busy="loading" @dragover.prevent @drop="onDrop">
-        <div class="content-caption"><span>{{ searchQuery ? 'Search results' : 'All files' }}</span><span>{{ view === 'browse' ? 'Name ↑' : 'Across your drives' }}</span></div>
-        <div v-if="loading && !activeEntries.length" class="empty-state" role="status"><span class="loading-spinner"></span><h2>Opening your files…</h2></div>
-        <div v-else-if="!activeEntries.length" class="empty-state" role="status">
-          <div class="empty-symbol"><UiIcon :name="searchQuery ? 'search' : view === 'starred' ? 'starred' : view === 'trash' ? 'trash' : 'folder'" :size="42" /></div>
-          <h2>{{ searchQuery ? 'No matching files' : view === 'starred' ? 'Keep your favorites close' : view === 'trash' ? 'All clear' : 'Make yourself at home' }}</h2>
-          <p>{{ searchQuery ? 'Try a different name or a shorter search.' : view === 'starred' ? 'Star a file to find it here whenever you need it.' : view === 'trash' ? 'Deleted files will appear here.' : 'Upload your first file or create a folder to get started.' }}</p>
-          <button v-if="view === 'browse' && !searchQuery" class="empty-upload" @click="triggerFilePicker"><UiIcon name="upload" :size="18" />Upload files</button>
-        </div>
-        <FileGrid
-          v-else-if="files.viewMode === 'grid'"
-          :entries="activeEntries"
-          :disable-open="view === 'trash'"
-          @menu="activeMenu = $event"
-          @open="previewing = $event"
-          @folder-opened="onFolderOpened"
-          @changed="onEntryChanged"
-        />
-        <FileListView
-          v-else
-          :entries="activeEntries"
-          :disable-open="view === 'trash'"
-          @menu="activeMenu = $event"
-          @open="previewing = $event"
-          @folder-opened="onFolderOpened"
-          @changed="onEntryChanged"
-        />
+        <LinksView v-if="view === 'links'" />
+        <template v-else>
+          <div class="content-caption"><span>{{ searchQuery ? 'Search results' : 'All files' }}</span><span>{{ view === 'browse' ? 'Name ↑' : 'Across your drives' }}</span></div>
+          <div v-if="loading && !activeEntries.length" class="empty-state" role="status"><span class="loading-spinner"></span><h2>Opening your files…</h2></div>
+          <div v-else-if="!activeEntries.length" class="empty-state" role="status">
+            <div class="empty-symbol"><UiIcon :name="searchQuery ? 'search' : view === 'starred' ? 'starred' : view === 'trash' ? 'trash' : 'folder'" :size="42" /></div>
+            <h2>{{ searchQuery ? 'No matching files' : view === 'starred' ? 'Keep your favorites close' : view === 'trash' ? 'All clear' : 'Make yourself at home' }}</h2>
+            <p>{{ searchQuery ? 'Try a different name or a shorter search.' : view === 'starred' ? 'Star a file to find it here whenever you need it.' : view === 'trash' ? 'Deleted files will appear here.' : 'Upload your first file or create a folder to get started.' }}</p>
+            <button v-if="view === 'browse' && !searchQuery" class="empty-upload" @click="triggerFilePicker"><UiIcon name="upload" :size="18" />Upload files</button>
+          </div>
+          <FileGrid
+            v-else-if="files.viewMode === 'grid'"
+            :entries="activeEntries"
+            :disable-open="view === 'trash'"
+            @menu="activeMenu = $event"
+            @open="previewing = $event"
+            @folder-opened="onFolderOpened"
+            @changed="onEntryChanged"
+          />
+          <FileListView
+            v-else
+            :entries="activeEntries"
+            :disable-open="view === 'trash'"
+            @menu="activeMenu = $event"
+            @open="previewing = $event"
+            @folder-opened="onFolderOpened"
+            @changed="onEntryChanged"
+          />
+        </template>
       </main>
     </div>
     <NewFolderDialog v-if="showNewFolder" @close="showNewFolder = false" />

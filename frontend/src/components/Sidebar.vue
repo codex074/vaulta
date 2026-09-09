@@ -105,6 +105,10 @@ onUnmounted(() => {
       <span class="sidebar-icon"><UiIcon name="trash" /></span>
       <span class="sidebar-label">Trash</span>
     </button>
+    <button class="sidebar-item" :class="{ active: view === 'links' }" :aria-current="view === 'links' ? 'page' : undefined" @click="emit('navigate', 'links')">
+      <span class="sidebar-icon"><UiIcon name="link" /></span>
+      <span class="sidebar-label">Links</span>
+    </button>
     <button class="sidebar-item upload-item" @click="emit('upload')">
       <span class="sidebar-icon"><UiIcon name="upload" /></span>
       <span class="sidebar-label">Upload files</span>

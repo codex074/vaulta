@@ -14,7 +14,7 @@ const props = defineProps({
 const emit = defineEmits(['new-folder', 'search', 'upload'])
 const files = useFilesStore()
 const dropTargetPath = ref(null)
-const heading = computed(() => props.view === 'starred' ? 'Starred' : props.view === 'trash' ? 'Trash' : files.currentPath.split('/').filter(Boolean).at(-1) || (files.source === 'home' ? 'My Drive' : 'Shared'))
+const heading = computed(() => props.view === 'starred' ? 'Starred' : props.view === 'links' ? 'Links' : props.view === 'trash' ? 'Trash' : files.currentPath.split('/').filter(Boolean).at(-1) || (files.source === 'home' ? 'My Drive' : 'Shared'))
 const subtitle = computed(() => props.view === 'starred' ? 'Your favorites, all together.' : props.view === 'trash' ? 'Restore files or let them go.' : files.currentPath !== '/' ? 'A little more organized.' : files.source === 'home' ? 'A home for everything that matters.' : 'Good things are better shared.')
 
 const allSelected = computed(() =>
