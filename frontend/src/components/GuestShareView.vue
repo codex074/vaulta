@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import VaultaBrand from './VaultaBrand.vue'
 import GuestFileList from './GuestFileList.vue'
 import Lightbox from './Lightbox.vue'
+import PasswordInput from './PasswordInput.vue'
 import { getShareInfo, listPublic, fetchPublicBlobUrl, publicDownloadUrl } from '../api/publicShare.js'
 import { buildGuestUrls, mediaPlanFor } from './guestMedia.js'
 
@@ -187,7 +188,7 @@ async function downloadEntry(entry) {
 
       <form v-else-if="state === 'password'" class="password-gate" @submit.prevent="submitPassword">
         <label>This link needs a password
-          <input class="guest-password" v-model="passwordInput" type="password" autocomplete="off" autofocus />
+          <PasswordInput class="guest-password" v-model="passwordInput" autocomplete="off" autofocus />
         </label>
         <p v-if="passwordError" class="gate-error" role="alert">{{ passwordError }}</p>
         <button type="submit">Open</button>
@@ -221,7 +222,7 @@ async function downloadEntry(entry) {
 .guest-status h2 { color: var(--text); margin: 0 0 8px; }
 .password-gate { display: flex; flex-direction: column; gap: 10px; max-width: 360px; margin: 48px auto; }
 .password-gate label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
-.password-gate input { padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elevated); color: var(--text); font-size: 16px; }
+.password-gate :deep(input) { padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-elevated); color: var(--text); font-size: 16px; }
 .password-gate button, .guest-status button { min-height: 44px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-size: 15px; }
 .gate-error { color: #d33; font-size: 13px; margin: 0; }
 .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 12px; font-size: 14px; }

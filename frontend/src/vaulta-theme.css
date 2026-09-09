@@ -201,6 +201,8 @@ input[type="checkbox"] { accent-color: var(--accent); width: 20px; height: 20px;
 #app .field input, #app .dialog input:not([type="checkbox"]), #app .menu input { width: 100%; min-width: 0; min-height: 46px; padding: 12px; border: 1px solid var(--field-border); border-radius: 11px; background: var(--bg); color: var(--text); font-size: 16px; }
 #app .field input:focus, #app .dialog input:focus, #app .menu input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 #app .dialog button { min-height: 44px; border-radius: 10px; }
+#app .password-field input { padding-right: 44px; }
+#app .password-field .toggle-password { color: var(--text-muted); width: 40px; height: 40px; min-height: 0; padding: 0; }
 #app .dialog.account-settings { width: min(560px, 100%); padding: 0; }
 #app .dialog .close-button { min-width: 44px; border: 0; border-radius: 50%; background: var(--bg); }
 #app .dialog-footer button, #app .actions button { min-width: 80px; }

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import VaultaBrand from './VaultaBrand.vue'
+import PasswordInput from './PasswordInput.vue'
 
 const auth = useAuthStore()
 const username = ref('')
@@ -43,7 +44,7 @@ async function onSubmit() {
 
       <label class="field">
         <span class="field-label">Password</span>
-        <input v-model="password" type="password" autocomplete="current-password" placeholder="Your password" required />
+        <PasswordInput v-model="password" autocomplete="current-password" placeholder="Your password" required />
       </label>
 
       <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>

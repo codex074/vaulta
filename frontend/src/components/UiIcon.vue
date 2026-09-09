@@ -21,6 +21,15 @@ defineProps({ name: { type: String, required: true }, size: { type: Number, defa
       <path d="M8.2 11.8a3 3 0 0 0 4.2 0l2.4-2.4a3 3 0 0 0-4.2-4.2l-1 1" />
       <path d="M11.8 8.2a3 3 0 0 0-4.2 0L5.2 10.6a3 3 0 0 0 4.2 4.2l1-1" />
     </g>
+    <g v-else-if="name === 'eye'">
+      <path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10Z" />
+      <circle cx="10" cy="10" r="2.4" />
+    </g>
+    <g v-else-if="name === 'eye-off'">
+      <path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10Z" />
+      <circle cx="10" cy="10" r="2.4" />
+      <path d="M3.5 3.5l13 13" />
+    </g>
     <g v-else-if="name === 'upload'">
       <path d="M3 13.1v3.1h14v-3.1M10 13V3.2M6.6 6.7 10 3.2l3.4 3.5" />
       <path d="M6.2 10.2h7.6" opacity=".45" />

@@ -2,6 +2,7 @@
 import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
+import PasswordInput from './PasswordInput.vue'
 import { listUsers, createUser, deleteUser, isValidUsername, updateUserScopes } from '../api/users.js'
 import { listProfiles, updateUserDisplayName, deleteUserProfile } from '../api/profiles.js'
 import { listQuotas, setUserQuota, deleteUserQuota, gbToBytes, bytesToGb } from '../api/quota.js'
@@ -260,7 +261,7 @@ async function enableMyDriveAccess() {
 
       <label class="field">
         Your password
-        <input v-model="actorPassword" type="password" placeholder="Required to create, edit or delete users" autocomplete="current-password" />
+        <PasswordInput v-model="actorPassword" placeholder="Required to create, edit or delete users" autocomplete="current-password" />
       </label>
 
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
@@ -327,7 +328,7 @@ async function enableMyDriveAccess() {
         </label>
         <label class="field">
           Password
-          <input v-model="newPassword" type="password" placeholder="Initial password" autocomplete="new-password" />
+          <PasswordInput v-model="newPassword" placeholder="Initial password" autocomplete="new-password" />
         </label>
         <label class="checkbox">
           <input v-model="newIsAdmin" type="checkbox" />
@@ -355,7 +356,7 @@ async function enableMyDriveAccess() {
 .dialog h3 { margin: 0; }
 .dialog h4 { margin: 0 0 6px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
-.dialog input[type="text"], .dialog input[type="password"], .dialog input[type="number"], .dialog input:not([type]) { padding: 10px; border: 1px solid var(--border); border-radius: 8px; width: 100%; margin-bottom: 8px; }
+.dialog input[type="text"], .dialog input[type="password"], .dialog input[type="number"], .dialog input:not([type]), .dialog :deep(.password-field input) { padding: 10px; border: 1px solid var(--border); border-radius: 8px; width: 100%; margin-bottom: 8px; }
 .error { color: var(--danger); font-size: 13px; margin: 0; }
 .hint { font-size: 12px; color: var(--text-muted); margin: 0; }
 .bootstrap-banner { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-muted); }

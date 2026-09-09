@@ -4,6 +4,7 @@ import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { createShare, sharesFor, deleteShare } from '../api/share.js'
 import { EXPIRY_OPTIONS, formatExpiry, guestUrlFor } from './shareLinks.js'
 import { showError } from '../errorToast.js'
+import PasswordInput from './PasswordInput.vue'
 
 const props = defineProps({
   entry: { type: Object, required: true },
@@ -78,7 +79,7 @@ async function copy(url) {
       </label>
       <label class="field">
         <span>Password (optional)</span>
-        <input class="password" v-model="password" type="password" autocomplete="new-password" placeholder="Leave empty for no password" />
+        <PasswordInput class="password" v-model="password" autocomplete="new-password" placeholder="Leave empty for no password" />
       </label>
       <button class="create" :disabled="creating" @click="doCreate">{{ creating ? 'Creating…' : 'Create link' }}</button>
 

@@ -2,6 +2,7 @@
 import { dialogFocus as vDialogFocus } from './dialogFocus.js'
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
+import PasswordInput from './PasswordInput.vue'
 
 const emit = defineEmits(['close'])
 const auth = useAuthStore()
@@ -113,16 +114,16 @@ async function savePassword() {
         </div>
         <label class="field">
           <span>Current password</span>
-          <input v-model="currentPassword" type="password" autocomplete="current-password" />
+          <PasswordInput v-model="currentPassword" autocomplete="current-password" />
         </label>
         <div class="password-grid">
           <label class="field">
             <span>New password</span>
-            <input v-model="newPassword" type="password" autocomplete="new-password" />
+            <PasswordInput v-model="newPassword" autocomplete="new-password" />
           </label>
           <label class="field">
             <span>Confirm new password</span>
-            <input v-model="confirmPassword" type="password" autocomplete="new-password" />
+            <PasswordInput v-model="confirmPassword" autocomplete="new-password" />
           </label>
         </div>
         <p v-if="passwordError" class="status error" role="alert">{{ passwordError }}</p>
