@@ -249,14 +249,26 @@ describe('auth store', () => {
     expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
   })
 
-  it('checkSession signs out when storage is available but no prefs exist at all (cookie-only state)', async () => {
+  it('checkSession signs out when identity loads but no prefs exist at all (legacy/purged/cookie-only session)', async () => {
+    authApi.getCurrentUser.mockResolvedValue({ id: 1, username: 'u' })
+    profilesApi.getMyProfile.mockResolvedValue({})
     authApi.logout.mockResolvedValue()
     const store = useAuthStore()
     await store.checkSession()
-    expect(authApi.getCurrentUser).not.toHaveBeenCalled()
+    expect(authApi.getCurrentUser).toHaveBeenCalled()
     expect(authApi.logout).toHaveBeenCalled()
     expect(store.user).toBeNull()
     expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+  })
+
+  it('checkSession with no prefs and no valid cookie (first-time visitor) never shows the idle notice or calls logout', async () => {
+    authApi.getCurrentUser.mockRejectedValue({ status: 401 })
+    const store = useAuthStore()
+    await store.checkSession()
+    expect(store.user).toBeNull()
+    expect(store.signedOutReason).toBe('')
+    expect(authApi.logout).not.toHaveBeenCalled()
+    expect(store.checked).toBe(true)
   })
 
   it('enforces the idle limit through the memory mirror when storage throws', () => {

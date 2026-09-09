@@ -78,13 +78,21 @@ logout, which clears the cookie). Previously the same exposure was 2 hours.
   `writeSessionPrefs(storage, { remember, lastActivity: now })`, clear
   `signedOutReason` **before** `loadIdentity()` (so it stays cleared even if
   identity loading itself throws), then load identity.
-- `checkSession()`: `prefs = currentPrefs()`; expired if `isIdleExpired(prefs, now)`
-  OR (`storageAvailable(storage())` && `!prefs.remember` && `prefs.lastActivity === null`)
-  — the second clause is the "cookie present but no prefs" case (legacy
-  session, storage purged independently of the cookie, or a previous
-  `idleSignOut` whose `logout()` failed); on either, `await idleSignOut()`
-  and return. Otherwise load identity as today and, on success, record
-  activity `now`.
+- `checkSession()`, in order: (1) `prefs = currentPrefs()`; if
+  `isIdleExpired(prefs, now)` → `await idleSignOut()` and return. (2)
+  `await loadIdentity()` — a 401 (or any other failure) here means no
+  session exists at all (e.g. a first-time visitor with no cookie); it falls
+  straight to the outer catch (`user = null`) with no idle notice and no
+  logout call, exactly like before this feature existed. (3) Only once
+  identity has loaded successfully (proving a session exists): if
+  `storageAvailable(storage())` && `!prefs.remember` && `prefs.lastActivity === null`
+  — the "cookie present but no prefs" case (legacy session, storage purged
+  independently of the cookie, or a previous `idleSignOut` whose `logout()`
+  failed) — `await idleSignOut()` and return (`user` stays `null`). (4)
+  Otherwise `this.user = identity` and record activity `now`. This ordering
+  matters: the fail-closed "no prefs" rule must never fire before a session
+  is confirmed to exist, or a first-time visitor would see the idle notice
+  and trigger a spurious logout call.
 - `signOut()`: `logout()` with its rejection swallowed (`console.warn`) so
   the caller never sees an unhandled rejection; `finally` clears prefs
   (storage AND mirror), `user`, `signedOutReason`, `lastRenewAt`.

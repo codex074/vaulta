@@ -36,17 +36,28 @@ export const useAuthStore = defineStore('auth', {
       try {
         const prefs = this.currentPrefs()
         const now = Date.now()
-        // A valid FBQ cookie can outlive the prefs that track it (legacy
-        // session from before this feature, storage purged by Safari ITP,
-        // or a previous idleSignOut whose logout() call failed). Treat that
-        // combination as expired too, rather than silently re-adopting a
-        // cookie we have no activity record for.
-        const cookieWithoutPrefs = storageAvailable(storage()) && !prefs.remember && prefs.lastActivity === null
-        if (isIdleExpired(prefs, now) || cookieWithoutPrefs) {
+        if (isIdleExpired(prefs, now)) {
           await this.idleSignOut()
           return
         }
-        this.user = await loadIdentity()
+        // A 401 (or any other failure) here means there is no session at
+        // all — e.g. a first-time visitor with no cookie. That must fall
+        // straight through to the outer catch with no idle notice and no
+        // logout call; it is NOT the same as the cookie-without-prefs case
+        // below, which only applies once we know a session actually exists.
+        const identity = await loadIdentity()
+        // A valid FBQ cookie can outlive the prefs that track it (legacy
+        // session from before this feature, storage purged by Safari ITP,
+        // or a previous idleSignOut whose logout() call failed). Only once
+        // identity has loaded successfully — proving a session exists — do
+        // we treat "no prefs at all" as expired too, rather than silently
+        // re-adopting a cookie we have no activity record for.
+        const cookieWithoutPrefs = storageAvailable(storage()) && !prefs.remember && prefs.lastActivity === null
+        if (cookieWithoutPrefs) {
+          await this.idleSignOut()
+          return
+        }
+        this.user = identity
         this.recordActivity()
       } catch {
         this.user = null
