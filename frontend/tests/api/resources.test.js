@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   listDirectory, makeDirectory, deleteItem,
   transferItem, moveItem, copyItem, renameItem, downloadUrl, previewUrl, uploadFile, getFileText,
+  removePartialUploads,
   SOURCES,
 } from '../../src/api/resources.js'
 import * as ownership from '../../src/api/ownership.js'
@@ -257,5 +258,121 @@ describe('resources API', () => {
     await expect(uploadFile('home', '/big.bin', new File(['x'], 'big.bin'), null, { signal: controller.signal }))
       .rejects.toMatchObject({ name: 'AbortError' })
     expect(mockXhr.send).not.toHaveBeenCalled()
+  })
+
+  // A scripted XHR double: each constructed instance records what was sent
+  // and lets the test drive onload/onerror. `responses` is consumed in order.
+  function scriptedXhr(responses) {
+    const instances = []
+    vi.stubGlobal('XMLHttpRequest', class {
+      constructor() {
+        const inst = {
+          headers: {}, upload: {}, status: 0, responseText: '',
+          open: (method, url) => { inst.method = method; inst.url = url },
+          setRequestHeader: (k, v) => { inst.headers[k] = v },
+          abort: () => { inst.aborted = true; inst.onabort?.() },
+          send: (body) => {
+            inst.body = body
+            instances.push(inst)
+            const next = responses.shift() ?? { status: 200 }
+            queueMicrotask(() => {
+              if (next.progress && inst.upload.onprogress) {
+                inst.upload.onprogress({ lengthComputable: true, loaded: next.progress.loaded, total: next.progress.total })
+              }
+              if (next.networkError) { inst.onerror?.(); return }
+              inst.status = next.status
+              inst.responseText = next.body ?? ''
+              inst.onload?.()
+            })
+          },
+        }
+        return inst
+      }
+    })
+    return instances
+  }
+
+  it('uploads a large file in chunks with FBQ chunk headers and aggregate progress', async () => {
+    const instances = scriptedXhr([
+      { status: 200, progress: { loaded: 4, total: 4 } },
+      { status: 200, progress: { loaded: 4, total: 4 } },
+      { status: 200, progress: { loaded: 2, total: 2 } },
+    ])
+    const progress = []
+    const file = new File(['0123456789'], 'big.bin')
+    await uploadFile('home', '/big.bin', file, (pct) => progress.push(pct), { chunkSize: 4 })
+    expect(instances).toHaveLength(3)
+    expect(instances.map((i) => i.headers['X-File-Chunk-Offset'])).toEqual(['0', '4', '8'])
+    expect(instances.every((i) => i.headers['X-File-Total-Size'] === '10')).toBe(true)
+    expect(instances.every((i) => i.headers['Content-Type'] === 'application/octet-stream')).toBe(true)
+    expect(instances.every((i) => i.url.includes('override=false') && i.url.includes('source=home'))).toBe(true)
+    expect(instances.map((i) => i.body.size)).toEqual([4, 4, 2])
+    expect(progress).toEqual([40, 80, 100])
+  })
+
+  it('keeps a small file on the single-request path', async () => {
+    const instances = scriptedXhr([{ status: 200 }])
+    await uploadFile('share', '/small.bin', new File(['abc'], 'small.bin'), null, { chunkSize: 4 })
+    expect(instances).toHaveLength(1)
+    expect(instances[0].headers['X-File-Chunk-Offset']).toBeUndefined()
+    expect(instances[0].body).toBeInstanceOf(File)
+  })
+
+  it('retries a chunk after a 5xx or network error, then succeeds', async () => {
+    const instances = scriptedXhr([
+      { status: 200 },
+      { networkError: true },
+      { status: 502, body: '{"message":"bad gateway"}' },
+      { status: 200 },
+      { status: 200 },
+    ])
+    await uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 })
+    expect(instances.map((i) => i.headers['X-File-Chunk-Offset'])).toEqual(['0', '4', '4', '4', '8'])
+  })
+
+  it('gives up after three attempts on the same chunk', async () => {
+    scriptedXhr([{ networkError: true }, { networkError: true }, { networkError: true }, { status: 200 }])
+    await expect(uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 }))
+      .rejects.toThrow('Network error during upload')
+  })
+
+  it('does not retry a 4xx and surfaces its message and status', async () => {
+    const instances = scriptedXhr([{ status: 409, body: '{"message":"already exists"}' }, { status: 200 }])
+    await expect(uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 }))
+      .rejects.toMatchObject({ status: 409, message: 'already exists' })
+    expect(instances).toHaveLength(1)
+  })
+
+  it('stops the chunk sequence when aborted', async () => {
+    const controller = new AbortController()
+    const instances = scriptedXhr([{ status: 200 }])
+    const promise = uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4, signal: controller.signal })
+    // Abort synchronously, before the scripted XHR's queued microtask fires,
+    // so the first chunk is still in flight. A macrotask wait (setTimeout)
+    // here would let the whole microtask chain — all three chunks — run to
+    // completion first, since nothing yields to the macrotask queue between
+    // chunks; by then there would be nothing left to abort.
+    controller.abort()
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+    expect(instances.length).toBeLessThanOrEqual(2)
+  })
+
+  it('removePartialUploads deletes only the temp files belonging to the cancelled name', async () => {
+    const md5 = 'b'.repeat(32)
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ files: [
+        { name: `movie.mp4.${md5}.uploading.tmp` }, { name: `other.mp4.${md5}.uploading.tmp` }, { name: 'movie.mp4' },
+      ] }) })
+      .mockResolvedValueOnce({ ok: true, status: 200 })
+    await removePartialUploads('home', '/Videos/movie.mp4')
+    expect(global.fetch.mock.calls[0][0]).toContain('/api/resources?path=%2FVideos&source=home')
+    expect(global.fetch.mock.calls[1][0]).toContain(`path=%2FVideos%2Fmovie.mp4.${md5}.uploading.tmp`)
+    expect(global.fetch.mock.calls[1][1].method).toBe('DELETE')
+    expect(global.fetch.mock.calls).toHaveLength(2)
+  })
+
+  it('removePartialUploads never throws', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('down'))
+    await expect(removePartialUploads('home', '/x.bin')).resolves.toBeUndefined()
   })
 })

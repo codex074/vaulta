@@ -1,5 +1,6 @@
 import { authorizedFetch, apiError, notifyUnauthorized } from './http.js'
 import { moveOwnership } from './ownership.js'
+import { CHUNK_SIZE, shouldChunk, planChunks, overallProgress, isRetryable, partialUploadsFor } from '../components/chunkPlan.js'
 
 export const SOURCES = ['home', 'share']
 
@@ -27,12 +28,11 @@ function abortError() {
   return err
 }
 
-// `signal` (an AbortSignal) lets the caller cancel an in-flight upload: the
-// XHR is aborted and the promise rejects with an AbortError, so callers can
-// tell a deliberate cancel apart from a failure. FileBrowser writes uploads
-// as a stream, so a cancelled upload can leave a partial file behind — it is
-// the caller's job to delete it (see App.vue's cancel handling).
-export function uploadFile(source, path, file, onProgress, { signal } = {}) {
+// One XHR. `onProgress(loaded, total)` reports raw bytes; callers map it to
+// whatever scale they need. Rejects with AbortError on abort, with an Error
+// carrying `.status` on a non-2xx response, and with a plain Error on a
+// network failure (no status — the retry helper treats that as transient).
+function sendUpload({ url, body, contentType, headers = {}, onProgress, signal }) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(abortError())
@@ -52,12 +52,13 @@ export function uploadFile(source, path, file, onProgress, { signal } = {}) {
     }
     signal?.addEventListener('abort', onAbort)
     xhr.onabort = () => finish(reject)(abortError())
-    xhr.open('POST', resourcesUrl(source, path, { override: 'false' }), true)
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    xhr.open('POST', url, true)
+    xhr.setRequestHeader('Content-Type', contentType)
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value)
     xhr.withCredentials = true
     if (onProgress) {
       xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
+        if (event.lengthComputable) onProgress(event.loaded, event.total)
       }
     }
     xhr.onload = () => {
@@ -76,8 +77,68 @@ export function uploadFile(source, path, file, onProgress, { signal } = {}) {
       }
     }
     xhr.onerror = () => finish(reject)(new Error('Network error during upload'))
-    xhr.send(file)
+    xhr.send(body)
   })
+}
+
+// `signal` (an AbortSignal) lets the caller cancel an in-flight upload: the
+// XHR is aborted and the promise rejects with an AbortError, so callers can
+// tell a deliberate cancel apart from a failure. Files above CHUNK_SIZE go up
+// in pieces on the same endpoint using FBQ's chunk protocol (see
+// chunkPlan.js) — Cloudflare rejects single request bodies over 100 MB
+// before they ever reach the NAS. FileBrowser writes uploads as a stream, so
+// a cancelled upload can leave a partial file (or chunk temp file) behind —
+// it is the caller's job to delete it (see App.vue's cancel handling, and
+// removePartialUploads below).
+export async function uploadFile(source, path, file, onProgress, { signal, chunkSize = CHUNK_SIZE } = {}) {
+  const url = resourcesUrl(source, path, { override: 'false' })
+  if (!shouldChunk(file.size, chunkSize)) {
+    return sendUpload({
+      url,
+      body: file,
+      contentType: file.type || 'application/octet-stream',
+      onProgress: onProgress ? (loaded, total) => onProgress(Math.round((loaded / total) * 100)) : null,
+      signal,
+    })
+  }
+  for (const { offset, end } of planChunks(file.size, chunkSize)) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await sendUpload({
+          url,
+          body: file.slice(offset, end),
+          contentType: 'application/octet-stream',
+          headers: { 'X-File-Chunk-Offset': String(offset), 'X-File-Total-Size': String(file.size) },
+          onProgress: onProgress ? (loaded) => onProgress(overallProgress(offset, loaded, file.size)) : null,
+          signal,
+        })
+        break
+      } catch (err) {
+        if (!isRetryable(err, attempt)) throw err
+      }
+    }
+  }
+}
+
+// A cancelled chunked upload can leave FBQ's "<name>.<md5>.uploading.tmp"
+// beside the target. Best-effort removal; nothing here may throw.
+export async function removePartialUploads(source, fullPath) {
+  try {
+    const slash = fullPath.lastIndexOf('/')
+    const dir = slash <= 0 ? '/' : fullPath.slice(0, slash)
+    const name = fullPath.slice(slash + 1)
+    const listing = await listDirectory(source, dir)
+    const base = dir.endsWith('/') ? dir : `${dir}/`
+    for (const partial of partialUploadsFor(name, listing.files || [])) {
+      try {
+        await deleteItem(source, `${base}${partial.name}`)
+      } catch {
+        // leave it; the user can remove it from the listing
+      }
+    }
+  } catch {
+    // listing failed — nothing we can do, and the upload error already shows
+  }
 }
 
 export async function deleteItem(source, path) {
