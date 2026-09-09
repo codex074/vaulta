@@ -8,6 +8,7 @@ import { formatSize } from './fileFormat.js'
 import { quotaPercent, quotaFillColor, quotaLabel } from './quotaMath.js'
 import AccountSettingsDialog from './AccountSettingsDialog.vue'
 import ManageUsersDialog from './ManageUsersDialog.vue'
+import DiskStatusDialog from './DiskStatusDialog.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import VaultaBrand from './VaultaBrand.vue'
 import UiIcon from './UiIcon.vue'
@@ -20,6 +21,7 @@ const quota = useQuotaStore()
 const showAccountMenu = ref(false)
 const showAccountSettings = ref(false)
 const showManageUsers = ref(false)
+const showDiskStatus = ref(false)
 const accountInitial = computed(() => (auth.user?.displayName || auth.user?.username || 'A').trim().charAt(0).toUpperCase())
 
 function openAccountSettings() {
@@ -30,6 +32,11 @@ function openAccountSettings() {
 function openManageUsers() {
   showAccountMenu.value = false
   showManageUsers.value = true
+}
+
+function openDiskStatus() {
+  showAccountMenu.value = false
+  showDiskStatus.value = true
 }
 
 // Non-admins with a private drive see their own quota usage here; everyone
@@ -166,12 +173,14 @@ onUnmounted(() => {
         <div class="appearance-row"><span>Appearance</span><ThemeToggle /></div>
         <button @click="openAccountSettings">Account settings</button>
         <button v-if="auth.user?.permissions?.admin" @click="openManageUsers">Manage users</button>
+        <button v-if="auth.user?.permissions?.admin" @click="openDiskStatus">Disk status</button>
         <button class="danger" @click="auth.signOut()">Sign out</button>
       </div>
     </div>
   </nav>
   <AccountSettingsDialog v-if="showAccountSettings" @close="showAccountSettings = false" />
   <ManageUsersDialog v-if="showManageUsers" @close="showManageUsers = false" />
+  <DiskStatusDialog v-if="showDiskStatus" @close="showDiskStatus = false" />
 </template>
 
 <style scoped>

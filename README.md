@@ -39,6 +39,7 @@ Vaulta sits in front of [FileBrowser Quantum](https://github.com/gtsteffaniak/fi
 | 📝 | **Office editing** | With OnlyOffice configured, `docx` `xlsx` `pptx` (and the other Word/Cell/Slide formats) open in OnlyOffice and can be edited in place; changes save when the document is closed. |
 | 🔗 | **Guest links** | Share any file or folder as a read-only link (`/s/<hash>`) with an expiry and an optional password; guests browse, preview and download in Vaulta's own UI, no account needed. |
 | 👥 | **Accounts** | Display-name profiles keyed by FBQ's immutable user ID, change password, and an admin **Manage users** dialog (create/delete users, assign or fix private drives, set quotas). |
+| 💽 | **Disk status** | Admins open **Disk status** from the account menu to see SMART health, temperature, power-on hours, bad sectors and SSD/NVMe wear for every physical disk, read live from the Proxmox host that owns them. Optional; needs a read-only Proxmox API token. |
 | 🔐 | **Sessions** | **Keep me signed in** at login renews FBQ tokens as you use the app; otherwise Vaulta signs you out after 1 hour without activity. Every password field has a show/hide toggle. |
 | 📱 | **Mobile-first** | Installable PWA, bottom tabs on phones, adaptive sidebar on iPad/desktop, light and dark themes. |
 
@@ -163,6 +164,59 @@ The exact keys are documented in `docs/superpowers/specs/2026-09-08-onlyoffice-d
 </details>
 
 <details>
+<summary><b>Disk status (optional, admin)</b></summary>
+
+When the NAS runs as a VM (TrueNAS on Proxmox, for example) the guest only sees
+virtual disks and has no SMART data. Vaulta instead asks the **Proxmox host**
+over its API and shows the result to admins in **Disk status** (account menu).
+Nothing is shown unless this is configured; numbers are always read live and
+a disk whose SMART query fails is reported as `UNKNOWN`, never guessed.
+
+**1. Create a read-only token on the Proxmox host** (as root on the host):
+
+```bash
+pveum role add VaultaDiskAudit -privs Sys.Audit
+pveum user add vaulta@pve -comment "Vaulta disk status read-only"
+pveum acl modify / -user vaulta@pve -role VaultaDiskAudit
+pveum user token add vaulta@pve disks -privsep 0     # prints the secret once
+```
+
+`Sys.Audit` only lets the token *read* `/nodes/<node>/disks/list` and
+`/nodes/<node>/disks/smart`; it cannot change or control anything.
+
+**2. Trust the host's certificate.** Copy the cluster CA
+(`/etc/pve/pve-root-ca.pem` on the host) into Vaulta's data directory as
+`proxmox-ca.pem`. Vaulta verifies the API's TLS certificate against it
+(hostname/IP included) — it never disables verification.
+
+**3. Write `proxmox.json`** (mode `0600`) into the data directory
+(`NASAPI_DATA_PATH`, `/var/lib/vaulta` by default):
+
+```json
+{
+  "url": "https://192.168.1.16:8006",
+  "node": "pve2",
+  "tokenId": "vaulta@pve!disks",
+  "secret": "<the token secret>",
+  "caFile": "/var/lib/vaulta/proxmox-ca.pem",
+  "labels": {
+    "/dev/sda": "NAS data (tank)",
+    "/dev/nvme0n1": "Proxmox boot / VM system disk"
+  }
+}
+```
+
+`labels` is optional and maps device paths to the names shown on each card.
+Restart the container after writing the file. Results are cached for 60 s;
+the dialog's **Refresh** button bypasses the cache. Endpoint:
+`GET /nasapi/system/disks` (admin only; `503` when not configured).
+
+Temperature colours: HDD under 45 °C is normal, 45–50 °C warns, above 50 °C
+is hot; SSD/NVMe under 60 °C is normal, 60–70 °C warns, above 70 °C is hot.
+
+</details>
+
+<details>
 <summary><b>Environment variables (nasapi)</b></summary>
 
 All are read by `nasapi` (`docker/nasapi/main.go`).
@@ -173,7 +227,7 @@ All are read by `nasapi` (`docker/nasapi/main.go`).
 | `NASAPI_SHARE_PATH` | `/srv/share` | Mount point of the `share` source inside the container. |
 | `NASAPI_HOME_PATH` | `/srv/home` | Mount point of the `home` source. Usage per user is computed by walking `<home>/<username>`. |
 | `NASAPI_STAT_PATH` | `/srv/share` | Path that is `statfs()`ed for the sidebar's total/free disk numbers. |
-| `NASAPI_DATA_PATH` | `/var/lib/vaulta` | Where `profiles.json`, `ownership.json` and `quotas.json` live. Mount it read-write and persistently. |
+| `NASAPI_DATA_PATH` | `/var/lib/vaulta` | Where `profiles.json`, `ownership.json`, `quotas.json` and the optional `proxmox.json` / `proxmox-ca.pem` live. Mount it read-write and persistently. |
 | `NASAPI_ONLYOFFICE_URL` | *(empty)* | Public URL of the OnlyOffice Document Server. Empty disables Office viewing. |
 | `NASAPI_PORT` | `9190` | Loopback port nasapi listens on. Must match `docker/nginx.conf` if changed. |
 
@@ -186,7 +240,7 @@ All are read by `nasapi` (`docker/nasapi/main.go`).
 |---|---|---|
 | `/srv/share` | `ro` | Disk usage for the storage bar (`statfs`). Required. |
 | `/srv/home` | `ro` | Per-user usage walks for quota enforcement. Required. |
-| `/var/lib/vaulta` | `rw` | Persistent profiles, ownership records and quotas. Required. |
+| `/var/lib/vaulta` | `rw` | Persistent profiles, ownership records, quotas and the optional Proxmox disk-status config. Required. |
 
 Vaulta only ever *reads* file contents through these mounts. Writes go through FBQ, which needs the same directories mounted read-write on its side.
 

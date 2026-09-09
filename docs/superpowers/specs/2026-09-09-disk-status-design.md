@@ -71,8 +71,8 @@ Admin only via the existing `requireAdmin`. Response:
       "model": "ST2000LM007-1R8174", "serial": "WDZQLV5G",
       "sizeBytes": 2000398934016, "type": "hdd", "usedBy": "ZFS",
       "health": "PASSED",
-      "temperatureC": 44,
-      "powerOnHours": 5823,
+      "temperatureC": 45,
+      "powerOnHours": 5824,
       "reallocatedSectors": 0, "pendingSectors": 0,
       "wearPercent": null
     },

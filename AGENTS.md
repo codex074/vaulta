@@ -94,6 +94,16 @@ other worktrees may be on other branches.
   read-write. nasapi's JSON stores (`profiles.json`, `ownership.json`,
   `quotas.json`) persist in `/mnt/.ix-apps/app_mounts/nas-webui/config`
   (→ `/var/lib/vaulta`).
+- **Disk status** (admin dialog) reads SMART from the Proxmox host, not the
+  VM: the VM only sees `QEMU HARDDISK` and has no SMART. The physical disks are
+  `/dev/sda` (Seagate 2 TB passed through to VM 105 as `scsi1`, ZFS `tank`) and
+  `/dev/nvme0n1` (pve2 boot + the VM's 32 GB system disk on `local-lvm`).
+  nasapi calls `https://192.168.1.16:8006` with token `vaulta@pve!disks`
+  (user `vaulta@pve`, role `VaultaDiskAudit` = `Sys.Audit` only, created
+  2026-09-09). Config lives next to the JSON stores as `proxmox.json` +
+  `proxmox-ca.pem` (copy of pve2's `/etc/pve/pve-root-ca.pem`). The secret is
+  only in that file; if it must be rotated, `pveum user token remove
+  vaulta@pve disks`, re-add, and rewrite the file via `--pass-stdin`.
 
 ## Deploy (the established path — follow it exactly)
 

@@ -349,6 +349,7 @@ func (s *ownershipStore) saveLocked() error {
 type apiServerConfig struct {
 	StatPath, SharePath, HomePath         string
 	ProfilePath, OwnershipPath, QuotaPath string
+	ProxmoxConfigPath                     string
 	FileBrowserURL, OnlyOfficeURL         string
 	Client                                *http.Client      // identity lookups, 5s timeout
 	ProxyTransport                        http.RoundTripper // uploads; no timeout
@@ -366,6 +367,7 @@ type apiServer struct {
 	usage          *usageTracker
 	proxy          *httputil.ReverseProxy
 	onlyOfficeURL  string
+	disks          *diskMonitor
 }
 
 const usageCacheTTL = 30 * time.Second
@@ -407,6 +409,7 @@ func newAPIServer(cfg apiServerConfig) (*apiServer, error) {
 		usage:          newUsageTracker(usageCacheTTL),
 		proxy:          proxy,
 		onlyOfficeURL:  cfg.OnlyOfficeURL,
+		disks:          newDiskMonitor(cfg.ProxmoxConfigPath),
 	}, nil
 }
 
@@ -424,6 +427,7 @@ func (s *apiServer) handler() http.Handler {
 	mux.HandleFunc("/quotas", s.handleQuotas)
 	mux.HandleFunc("/quotas/", s.handleQuotaByUID)
 	mux.HandleFunc("/api/resources", s.handleResourcesGate)
+	mux.HandleFunc("/system/disks", s.handleSystemDisks)
 	return mux
 }
 
@@ -775,14 +779,15 @@ func main() {
 	port := envOrDefault("NASAPI_PORT", "9190")
 
 	server, err := newAPIServer(apiServerConfig{
-		StatPath:       statPath,
-		SharePath:      sharePath,
-		HomePath:       homePath,
-		ProfilePath:    filepath.Join(dataPath, "profiles.json"),
-		OwnershipPath:  filepath.Join(dataPath, "ownership.json"),
-		QuotaPath:      filepath.Join(dataPath, "quotas.json"),
-		FileBrowserURL: fileBrowserURL,
-		OnlyOfficeURL:  onlyOfficeURL,
+		StatPath:          statPath,
+		SharePath:         sharePath,
+		HomePath:          homePath,
+		ProfilePath:       filepath.Join(dataPath, "profiles.json"),
+		OwnershipPath:     filepath.Join(dataPath, "ownership.json"),
+		QuotaPath:         filepath.Join(dataPath, "quotas.json"),
+		ProxmoxConfigPath: filepath.Join(dataPath, "proxmox.json"),
+		FileBrowserURL:    fileBrowserURL,
+		OnlyOfficeURL:     onlyOfficeURL,
 	})
 	if err != nil {
 		log.Fatal(err)
