@@ -169,13 +169,19 @@ describe('auth store', () => {
     authApi.logout.mockResolvedValue()
     const store = useAuthStore()
     const t0 = 5_000_000_000
-    await store.signIn('u', 'p')
-    store.recordActivity(t0)
-    expect(store.enforceIdle(t0 + 3_600_000)).toBe(false)
-    expect(store.user).not.toBeNull()
-    expect(store.enforceIdle(t0 + 3_600_001)).toBe(true)
-    expect(store.user).toBeNull()
-    expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+    vi.useFakeTimers()
+    vi.setSystemTime(t0)
+    try {
+      await store.signIn('u', 'p')
+      store.recordActivity(t0)
+      expect(store.enforceIdle(t0 + 3_600_000)).toBe(false)
+      expect(store.user).not.toBeNull()
+      expect(store.enforceIdle(t0 + 3_600_001)).toBe(true)
+      expect(store.user).toBeNull()
+      expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('recordActivity throttles storage writes', async () => {
@@ -201,6 +207,7 @@ describe('auth store', () => {
   })
 
   it('renewIfDue swallows a failed renewal', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     authApi.renewToken.mockRejectedValue(new Error('nope'))
     const store = useAuthStore()
     store.user = { id: 1 }

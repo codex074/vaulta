@@ -63,13 +63,7 @@ export const useAuthStore = defineStore('auth', {
     },
     recordActivity(now = Date.now()) {
       const prefs = readSessionPrefs(storage())
-      // A stored stamp ahead of `now` (clock skew, or a caller passing an
-      // explicit `now` older than the wall-clock stamp already on disk)
-      // would otherwise make isIdleExpired false indefinitely — re-stamp.
-      const stale = prefs.lastActivity !== null && now < prefs.lastActivity
-      if (stale || shouldWriteActivity(prefs.lastActivity, now)) {
-        writeSessionPrefs(storage(), { remember: prefs.remember, lastActivity: now })
-      }
+      if (shouldWriteActivity(prefs.lastActivity, now)) writeSessionPrefs(storage(), { remember: prefs.remember, lastActivity: now })
     },
     enforceIdle(now = Date.now()) {
       if (!this.user || !isIdleExpired(readSessionPrefs(storage()), now)) return false
