@@ -38,10 +38,19 @@ async function load(path) {
     entries.value = withPaths(listing, path)
     state.value = 'browse'
   } catch (err) {
-    if (err.status === 401) throw err
-    if (err.status === 404) { state.value = 'unavailable'; return }
-    listingError.value = err.message || 'Could not load this folder.'
-    if (state.value === 'loading') state.value = 'error'
+    if (err.status === 404) {
+      // A 404 while already browsing means the subfolder vanished, not the
+      // share itself — keep the current listing on screen. Only the
+      // initial load (still 'loading', or right after the password gate)
+      // treats 404 as the share being gone.
+      if (state.value === 'browse') {
+        listingError.value = 'This folder no longer exists.'
+        return
+      }
+      state.value = 'unavailable'
+      return
+    }
+    throw err
   }
 }
 
@@ -53,7 +62,12 @@ async function start() {
     return
   }
   if (info.value.hasPassword) { state.value = 'password'; return }
-  await load('/')
+  try {
+    await load('/')
+  } catch (err) {
+    state.value = 'error'
+    listingError.value = err.message || 'Could not open this link.'
+  }
 }
 start()
 
@@ -67,11 +81,30 @@ async function submitPassword() {
       password.value = ''
       passwordError.value = 'รหัสไม่ถูกต้อง'
       state.value = 'password'
+      return
     }
+    passwordError.value = err.message || 'Could not open this link.'
+    state.value = 'password'
   }
 }
 
-function navigateTo(path) { return load(path).catch(() => {}) }
+function navigateTo(path) {
+  return load(path).catch((err) => {
+    if (err.status === 401) {
+      // The link's password was revoked/rotated out from under an
+      // already-browsing guest — never leave them silently stuck.
+      if (hasPassword.value) {
+        password.value = ''
+        passwordError.value = 'Please enter the password again.'
+        state.value = 'password'
+      } else {
+        listingError.value = 'Access to this link was revoked.'
+      }
+      return
+    }
+    listingError.value = err.message || 'Could not load this folder.'
+  })
+}
 function crumbPath(index) { return `/${crumbs.value.slice(0, index + 1).join('/')}` }
 
 async function openEntry(entry) {
