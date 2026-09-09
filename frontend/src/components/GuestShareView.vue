@@ -39,11 +39,21 @@ async function load(path) {
     state.value = 'browse'
   } catch (err) {
     if (err.status === 404) {
-      // A 404 while already browsing means the subfolder vanished, not the
-      // share itself — keep the current listing on screen. Only the
-      // initial load (still 'loading', or right after the password gate)
-      // treats 404 as the share being gone.
+      // A 404 while already browsing usually means the subfolder vanished,
+      // not the share itself — keep the current listing on screen. But the
+      // share could also have been revoked/expired out from under an
+      // already-browsing guest, so re-check it before assuming it's just
+      // the folder. Only the initial load (still 'loading', or right after
+      // the password gate) otherwise treats 404 as the share being gone.
       if (state.value === 'browse') {
+        try {
+          await getShareInfo(props.hash)
+        } catch (infoErr) {
+          if (infoErr.status === 404) {
+            state.value = 'unavailable'
+            return
+          }
+        }
         listingError.value = 'This folder no longer exists.'
         return
       }
@@ -58,6 +68,11 @@ async function start() {
   try {
     info.value = await getShareInfo(props.hash)
   } catch (err) {
+    if (err.status === 401) {
+      info.value = { hasPassword: true }
+      state.value = 'password'
+      return
+    }
     state.value = err.status === 404 ? 'unavailable' : 'error'
     return
   }
@@ -113,6 +128,7 @@ async function openEntry(entry) {
   if (plan.kind === 'other') return downloadEntry(entry)
   try {
     const built = await buildGuestUrls(entry, { hash: props.hash, password: password.value })
+    revokePreview() // opening a new preview without closing the last one must not leak its blob URL
     revokePreview = built.revoke
     previewUrls.value = built.urls
     previewing.value = entry

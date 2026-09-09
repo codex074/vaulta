@@ -117,6 +117,25 @@ describe('GuestShareView', () => {
     expect(wrapper.text()).toContain('Please enter the password again.')
   })
 
+  it('shows the unavailable screen when a subfolder 404s mid-browse because the share itself was revoked', async () => {
+    getShareInfo.mockResolvedValueOnce({ title: 'Docs', hasPassword: false })
+    listPublic.mockResolvedValueOnce(listing)
+    const wrapper = mountView()
+    await flushPromises()
+    listPublic.mockRejectedValueOnce(Object.assign(new Error('not found'), { status: 404 }))
+    getShareInfo.mockRejectedValueOnce(Object.assign(new Error('not found'), { status: 404 }))
+    await wrapper.findAll('.guest-row')[0].get('button.guest-open').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('ลิงก์นี้ใช้ไม่ได้แล้ว')
+  })
+
+  it('returns to the password gate when getShareInfo itself is password-protected (401)', async () => {
+    getShareInfo.mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }))
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('form.password-gate').exists()).toBe(true)
+  })
+
   it('shows the error screen with a retry button when the initial listing fails with a server error', async () => {
     getShareInfo.mockResolvedValue({ title: 'Docs', hasPassword: false })
     listPublic.mockRejectedValue(Object.assign(new Error('server error'), { status: 500 }))

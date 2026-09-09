@@ -214,6 +214,13 @@ input[type="checkbox"] { accent-color: var(--accent); width: 20px; height: 20px;
 #app .menu .danger { color: var(--danger); }
 #app .menu .menu-cancel { justify-content: center; color: var(--accent); background: var(--bg); font-weight: 600; margin-top: 8px; }
 #app .menu input { margin: 6px 0; }
+/* Guest links: dialog + guest page. These beat the scoped component styles
+   the same way the rest of this file does. Placed before the mobile
+   breakpoints below so `.menu`'s full-width mobile override still wins for
+   .share-dialog (it shares the .menu class on its root element). */
+#app .share-dialog { width: min(480px, 100%); padding: 16px; border-radius: 16px; background: var(--bg-elevated); }
+#app .share-dialog button.create, #app .password-gate button, #app .guest-status button { color: #fff; }
+#app .share-dialog button.danger, #app .links-view button.danger { color: #d33; }
 #app .bulk-bar, #app .trash-bar, #app .loading-bar { margin: 0 38px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); flex-wrap: wrap; }
 #app .bulk-bar { background: var(--selected-bg); }
 #app .bulk-bar button, #app .trash-bar button { min-height: 44px; padding: 10px 14px; border: 0; border-radius: 10px; background: var(--bg-elevated); color: var(--accent); }

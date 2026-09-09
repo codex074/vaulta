@@ -34,7 +34,7 @@ export function formatExpiry(expireUnix, nowMs = Date.now()) {
   if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`
   const hours = Math.round(diffMs / 3_600_000)
   if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`
-  const days = Math.floor(diffMs / 86_400_000)
+  const days = Math.max(1, Math.floor(diffMs / 86_400_000))
   return `in ${days} day${days === 1 ? '' : 's'}`
 }
 

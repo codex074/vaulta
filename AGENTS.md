@@ -167,7 +167,9 @@ To ship a code change (build → run):
   gap). `viewOnly: false` has been live since 2026-09-09.
 - **Password shares can only be read with a request header** — the share
   token is never given to guests, so `<img>`/`<video>` can't authenticate;
-  `guestMedia.js` fetches blobs instead and video is download-only.
+  `guestMedia.js` fetches blobs instead and video is download-only. The guest
+  API is also rate-limited per `CF-Connecting-IP` at nginx (`limit_req` zone
+  `publicapi`); on the LAN the header is absent so there is no limit.
 - **Verification has been build/bundle-level only.** No agent this far has had
   login credentials, so the authenticated UI has never been visually checked on
   a real device, and the private-drives end-to-end checks (two real users,

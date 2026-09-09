@@ -43,6 +43,9 @@ describe('formatExpiry', () => {
     expect(formatExpiry(now / 1000 + 3 * 3600, now)).toBe('in 3 hours')
     expect(formatExpiry(now / 1000 + 6 * 86400 + 3600, now)).toBe('in 6 days')
   })
+  it('rounds 23.5-24h expiries up to 1 day, not down to 0', () => {
+    expect(formatExpiry(now / 1000 + 23.8 * 3600, now)).toBe('in 1 day')
+  })
 })
 
 describe('labels', () => {
