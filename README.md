@@ -20,7 +20,8 @@ own per-user scopes remain the security boundary.
   private drive are rejected with `413` before they reach FBQ.
 - **Drive-style browsing.** Grid and list views, breadcrumbs, search, select
   all, multi-select, drag-and-drop move, folder upload, upload progress with
-  per-file or whole-batch cancel.
+  per-file or whole-batch cancel; files over 25 MiB are uploaded in chunks, so
+  uploads beyond Cloudflare's 100 MB per-request limit work from outside the LAN.
 - **Starred and Trash.** Star anything; deleted files go to a `.trash` folder
   and can be restored or deleted forever. Owner-only delete on the shared drive.
 - **Previews and editing.** Image, video (Plyr player) and PDF lightbox

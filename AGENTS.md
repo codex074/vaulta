@@ -170,6 +170,14 @@ To ship a code change (build → run):
   `guestMedia.js` fetches blobs instead and video is download-only. The guest
   API is also rate-limited per `CF-Connecting-IP` at nginx (`limit_req` zone
   `publicapi`); on the LAN the header is absent so there is no limit.
+- **Cloudflare drops request bodies over 100 MB before they reach the NAS**
+  (413 from the edge, nothing in nginx/FBQ logs). `uploadFile` therefore sends
+  files over `CHUNK_SIZE` (25 MiB, `chunkPlan.js`) with FBQ's
+  `X-File-Chunk-Offset`/`X-File-Total-Size` headers on the same POST; FBQ
+  writes `<target>.<md5>.uploading.tmp` beside the target and renames on the
+  last chunk. Listings hide those temp files and cancel removes them
+  (`removePartialUploads`). The nasapi gate pre-checks the whole size on chunk
+  0 and still reserves per chunk.
 - **Verification has been build/bundle-level only.** No agent this far has had
   login credentials, so the authenticated UI has never been visually checked on
   a real device, and the private-drives end-to-end checks (two real users,
