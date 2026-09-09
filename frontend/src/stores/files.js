@@ -3,6 +3,7 @@ import { listDirectory } from '../api/resources.js'
 import { togglePinned } from '../api/pinned.js'
 import { softDelete } from '../api/trash.js'
 import { lookupOwnership } from '../api/ownership.js'
+import { isPartialUpload } from '../components/chunkPlan.js'
 import { parseSelectionKey } from '../components/pathHelpers.js'
 import { useStarredStore } from './starred.js'
 
@@ -37,7 +38,9 @@ export const useFilesStore = defineStore('files', {
         const result = await listDirectory(this.source, path)
         const folders = [...(result.folders || [])].sort((a, b) => a.name.localeCompare(b.name))
         const files = [...(result.files || [])].sort((a, b) => a.name.localeCompare(b.name))
-        const entries = [...folders, ...files].map((entry) => ({ ...entry, source: this.source }))
+        const entries = [...folders, ...files]
+          .filter((entry) => !isPartialUpload(entry.name))
+          .map((entry) => ({ ...entry, source: this.source }))
         // Ownership tracking stays share-only (see design spec's Non-Goals) —
         // a home drive has no other viewer to attribute uploads to.
         const records = this.source === 'share'

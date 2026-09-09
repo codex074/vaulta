@@ -6,7 +6,7 @@ import { useStarredStore } from './stores/starred.js'
 import { useTrashStore } from './stores/trash.js'
 import { useQuotaStore } from './stores/quota.js'
 import { useThemeStore } from './stores/theme.js'
-import { uploadFile, makeDirectory, deleteItem } from './api/resources.js'
+import { uploadFile, makeDirectory, deleteItem, removePartialUploads } from './api/resources.js'
 import { createUploadEntry, cancelUpload, activeUploads } from './components/uploadQueue.js'
 import { stampOwnership } from './api/ownership.js'
 import { onUnauthorized } from './api/http.js'
@@ -168,14 +168,16 @@ async function handleFiles(items) {
       if (err.name === 'AbortError') {
         entry.status = 'cancelled'
         entry.message = 'Cancelled'
-        // FileBrowser streams uploads straight to disk, so an aborted upload
-        // usually leaves a truncated file behind. Remove it best-effort; a
-        // 404 just means nothing had been written yet.
+        // FBQ streams a single upload straight to the target and a chunked
+        // one to a ".uploading.tmp" beside it, so an aborted upload can leave
+        // either a truncated file or that temp file behind. Remove both
+        // best-effort; a 404 just means nothing had been written yet.
         try {
           await deleteItem(source, fullPath)
         } catch {
           // Nothing to clean up, or it will show in the listing for the user to handle.
         }
+        await removePartialUploads(source, fullPath)
       } else {
         entry.status = 'error'
         entry.message = err.message || 'Failed'

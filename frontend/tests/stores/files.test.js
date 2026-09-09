@@ -265,4 +265,17 @@ describe('files store', () => {
     await store.toggleStar({ name: 'a.txt' })
     expect(starred.entries).toEqual([{ name: 'd.jpg', path: '/Photos/d.jpg', pinned: true }])
   })
+
+  it('hides FileBrowser partial-upload temp files from the listing', async () => {
+    resources.listDirectory.mockResolvedValue({
+      folders: [],
+      files: [
+        { name: 'movie.mp4', type: 'video/mp4' },
+        { name: `movie.mp4.${'c'.repeat(32)}.uploading.tmp`, type: 'application/octet-stream' },
+      ],
+    })
+    const store = useFilesStore()
+    await store.loadDirectory('/')
+    expect(store.entries.map((e) => e.name)).toEqual(['movie.mp4'])
+  })
 })
