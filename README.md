@@ -241,7 +241,9 @@ docker run --rm -v "$PWD/docker/nasapi":/app -w /app -e GOFLAGS=-mod=mod golang:
 
 The maintainer's instance runs as a TrueNAS SCALE custom app with
 `network_mode: host`, behind a Cloudflare Tunnel, next to a catalog-installed
-FBQ and an OnlyOffice container. TrueNAS does not build images, so the flow is
+FBQ and an OnlyOffice container. That instance's compose file expects the
+image tag `nas-webui:local`, not `vaulta:local` as in the examples above.
+TrueNAS does not build images, so the flow is
 `docker build --platform linux/amd64` on a workstation, `docker save`, copy
 the tarball to the host, `docker load`, then `docker compose ... up -d
 --force-recreate` with the app's compose project name. The full procedure and
