@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import GuestShareView from '../../src/components/GuestShareView.vue'
+import Lightbox from '../../src/components/Lightbox.vue'
 import { getShareInfo, listPublic } from '../../src/api/publicShare.js'
 
 vi.mock('../../src/api/publicShare.js', () => ({
@@ -52,6 +53,27 @@ describe('GuestShareView', () => {
     expect(rows[1].find('img.guest-thumb').attributes('src')).toContain('/public/api/resources/preview?hash=h1&path=%2Fa.jpg')
     expect(rows[2].find('img.guest-thumb').exists()).toBe(false)
     expect(rows[1].get('a.guest-download').attributes('href')).toBe('/public/api/resources/download?hash=h1&file=%2Fa.jpg')
+  })
+
+  it('opens a single-file share straight into the preview, keeping the file at path /', async () => {
+    // Live FBQ shape for a share whose target is one file: the resource
+    // itself comes back (no folders/files arrays) and the file lives at "/".
+    getShareInfo.mockResolvedValue({ hasPassword: false })
+    listPublic.mockResolvedValue({
+      name: 'IMG_3435.jpeg', type: 'image/jpeg', size: 3682304,
+      modified: '2026-09-07T16:41:47Z', hasPreview: true, path: '/', hash: 'h1',
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('This folder is empty.')
+    const rows = wrapper.findAll('.guest-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].get('.guest-name').text()).toBe('IMG_3435.jpeg')
+    expect(rows[0].get('img.guest-thumb').attributes('src')).toContain('path=%2F')
+    expect(rows[0].get('a.guest-download').attributes('href')).toBe('/public/api/resources/download?hash=h1&file=%2F')
+    expect(wrapper.findComponent(Lightbox).exists()).toBe(true)
+    expect(wrapper.findComponent(Lightbox).props('urls').original).toBe('/public/api/resources/download?hash=h1&file=%2F')
+    expect(wrapper.get('h1').text()).toBe('IMG_3435.jpeg')
   })
 
   it('navigates into a folder and back with the breadcrumb', async () => {

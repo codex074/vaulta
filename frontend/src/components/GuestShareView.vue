@@ -22,7 +22,9 @@ const previewUrls = ref(null)
 let revokePreview = () => {}
 
 const hasPassword = computed(() => Boolean(info.value?.hasPassword))
-const title = computed(() => info.value?.title || 'Shared with you')
+// Set when the share's target is a single file rather than a folder.
+const sharedFile = ref(null)
+const title = computed(() => info.value?.title || sharedFile.value?.name || 'Shared with you')
 const crumbs = computed(() => currentPath.value.split('/').filter(Boolean))
 
 function withPaths(listing, base) {
@@ -36,6 +38,18 @@ async function load(path) {
   try {
     const listing = await listPublic(props.hash, path, password.value)
     currentPath.value = path
+    if (listing.type !== 'directory') {
+      // FBQ answers a single-file share with the file resource itself, and
+      // the file is addressed as "/" inside the share — never stamp a name
+      // onto its path or downloads/thumbnails 404.
+      const file = { ...listing, path: '/' }
+      sharedFile.value = file
+      entries.value = [file]
+      state.value = 'browse'
+      if (mediaPlanFor(file, { hasPassword: hasPassword.value }).kind !== 'other') await openEntry(file)
+      return
+    }
+    sharedFile.value = null
     entries.value = withPaths(listing, path)
     state.value = 'browse'
   } catch (err) {
