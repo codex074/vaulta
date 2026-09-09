@@ -171,7 +171,7 @@ Without a password the same flow uses direct `/public/api/...` URLs.
 
 ## Security
 - Isolation and expiry are FBQ's: path fixed at creation inside the owner's
-  scope; hash 64 random hex-ish chars; password bcrypt; delete owner/admin
+  scope; hash generated server-side by FBQ (`secure_hash`); password bcrypt; delete owner/admin
   only. Vaulta adds no bypass.
 - Guests receive no session cookie, token, or user data. The public API
   answers only for the hash's subtree.
