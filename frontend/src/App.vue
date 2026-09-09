@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, watch, ref, reactive, computed } from 'vue'
+import { onMounted, onBeforeUnmount, watch, ref, reactive, computed } from 'vue'
 import { useAuthStore } from './stores/auth.js'
 import { useFilesStore } from './stores/files.js'
 import { useStarredStore } from './stores/starred.js'
@@ -10,6 +10,7 @@ import { uploadFile, makeDirectory, deleteItem, removePartialUploads } from './a
 import { createUploadEntry, cancelUpload, activeUploads } from './components/uploadQueue.js'
 import { stampOwnership } from './api/ownership.js'
 import { onUnauthorized } from './api/http.js'
+import { installSessionGuard } from './sessionGuard.js'
 import { showError } from './errorToast.js'
 import { partitionDeletable } from './permissions.js'
 import { collectFilesFromDataTransfer, directoriesFor } from './components/folderDrop.js'
@@ -71,7 +72,12 @@ function onFileInputChange(event) {
   event.target.value = ''
 }
 
-onMounted(() => auth.checkSession())
+let teardownSessionGuard = () => {}
+onMounted(async () => {
+  await auth.checkSession()
+  teardownSessionGuard = installSessionGuard(auth)
+})
+onBeforeUnmount(() => teardownSessionGuard())
 watch(() => auth.user, (user) => {
   if (user) {
     files.switchDrive(auth.hasHomeDrive ? 'home' : 'share')
