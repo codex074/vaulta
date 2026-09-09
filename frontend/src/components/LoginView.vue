@@ -152,11 +152,13 @@ async function onSubmit() {
   font-family: inherit;
 }
 
-.field input::placeholder {
+.field input::placeholder,
+.field :deep(input)::placeholder {
   color: var(--slate);
 }
 
-.field input:focus {
+.field input:focus,
+.field :deep(input):focus {
   outline: none;
   border-color: var(--signal);
   box-shadow: 0 0 0 3px rgba(255, 145, 66, 0.18);
