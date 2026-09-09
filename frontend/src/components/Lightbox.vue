@@ -33,7 +33,12 @@ const videoEl = ref(null)
 let player = null
 onMounted(() => {
   if (videoEl.value) {
-    player = new Plyr(videoEl.value, { speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] } })
+    player = new Plyr(videoEl.value, {
+      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+      // iPhone has no element Fullscreen API; iosNative hands the video to
+      // Safari's own player instead of Plyr's boxed-in CSS fallback.
+      fullscreen: { enabled: true, fallback: true, iosNative: true },
+    })
   }
 })
 onBeforeUnmount(() => {
@@ -181,9 +186,13 @@ function onOfficeLoadError() {
 .backdrop { position: fixed; inset: 0; background: rgba(15, 18, 25, 0.75); display: flex; align-items: center; justify-content: center; z-index: 30; }
 .frame { position: relative; max-width: 85vw; max-height: 85vh; max-height: 85dvh; background: var(--bg-elevated); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; justify-content: center; }
 .frame img { max-width: 100%; max-height: 75vh; max-height: 75dvh; }
-.frame :deep(.plyr) { max-width: 80vw; max-height: 75vh; max-height: 75dvh; }
-.frame :deep(.plyr__video-wrapper) { max-height: 75vh; max-height: 75dvh; }
-.frame :deep(video) { max-height: 75vh; max-height: 75dvh; }
+/* Size caps apply only while the player sits inside the frame. Plyr marks
+   both native and fallback fullscreen with .plyr--fullscreen-active; the
+   caps must not follow the player into fullscreen, or the video stays a
+   75dvh box on a black screen. */
+.frame :deep(.plyr:not(.plyr--fullscreen-active)) { max-width: 80vw; max-height: 75vh; max-height: 75dvh; }
+.frame :deep(.plyr:not(.plyr--fullscreen-active) .plyr__video-wrapper) { max-height: 75vh; max-height: 75dvh; }
+.frame :deep(.plyr:not(.plyr--fullscreen-active) video) { max-height: 75vh; max-height: 75dvh; }
 
 @media (max-width: 640px) {
   .frame { max-width: 94vw; padding: 12px; }

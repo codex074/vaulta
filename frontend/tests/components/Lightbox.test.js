@@ -6,7 +6,13 @@ import { getFileText } from '../../src/api/resources.js'
 import { getOnlyOfficeUrl } from '../../src/api/config.js'
 import { getOfficeConfig } from '../../src/api/office.js'
 
-vi.mock('plyr', () => ({ default: class { destroy() {} } }))
+const plyrCalls = vi.hoisted(() => [])
+vi.mock('plyr', () => ({
+  default: class {
+    constructor(el, options) { plyrCalls.push({ el, options }) }
+    destroy() {}
+  },
+}))
 vi.mock('plyr/dist/plyr.css', () => ({}))
 vi.mock('@onlyoffice/document-editor-vue', () => ({
   DocumentEditor: defineComponent({
@@ -97,5 +103,13 @@ describe('Lightbox documents', () => {
     await flushPromises()
     expect(wrapper.find('.fake-editor').exists()).toBe(false)
     expect(wrapper.get('.fallback a').attributes('href')).toBe('/dl')
+  })
+
+  it('lets a video go fullscreen, natively on iPhone, instead of staying boxed in the frame', async () => {
+    plyrCalls.length = 0
+    mount(Lightbox, { props: { entry: { name: 'clip.mp4', type: 'video/mp4', path: '/clip.mp4' } } })
+    await flushPromises()
+    expect(plyrCalls).toHaveLength(1)
+    expect(plyrCalls[0].options.fullscreen).toEqual({ enabled: true, fallback: true, iosNative: true })
   })
 })
