@@ -10,6 +10,7 @@ vi.mock('../../src/api/auth.js', () => ({
   logout: vi.fn(),
   getCurrentUser: vi.fn(),
   changePassword: vi.fn(),
+  renewToken: vi.fn(),
 }))
 
 vi.mock('../../src/api/profiles.js', () => ({
@@ -21,6 +22,7 @@ describe('auth store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   it('checkSession sets user on success', async () => {
@@ -123,5 +125,93 @@ describe('auth store', () => {
       store.user = { uid: '2' }
       expect(store.hasHomeDrive).toBe(false)
     })
+  })
+
+  it('signIn stores the remember choice and stamps activity', async () => {
+    authApi.getCurrentUser.mockResolvedValue({ id: 1, username: 'u' })
+    profilesApi.getMyProfile.mockResolvedValue({})
+    const store = useAuthStore()
+    await store.signIn('u', 'p', { remember: true })
+    expect(localStorage.getItem('vaulta-remember')).toBe('1')
+    expect(Number(localStorage.getItem('vaulta-last-activity'))).toBeGreaterThan(0)
+    await store.signIn('u', 'p')
+    expect(localStorage.getItem('vaulta-remember')).toBe('0')
+  })
+
+  it('checkSession signs out a stale unremembered session with a notice', async () => {
+    localStorage.setItem('vaulta-remember', '0')
+    localStorage.setItem('vaulta-last-activity', String(Date.now() - 2 * 3_600_000))
+    authApi.logout.mockResolvedValue()
+    const store = useAuthStore()
+    await store.checkSession()
+    expect(authApi.logout).toHaveBeenCalled()
+    expect(authApi.getCurrentUser).not.toHaveBeenCalled()
+    expect(store.user).toBeNull()
+    expect(store.checked).toBe(true)
+    expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+    expect(localStorage.getItem('vaulta-last-activity')).toBeNull()
+  })
+
+  it('checkSession keeps a remembered session however old it is', async () => {
+    localStorage.setItem('vaulta-remember', '1')
+    localStorage.setItem('vaulta-last-activity', String(Date.now() - 40 * 24 * 3_600_000))
+    authApi.getCurrentUser.mockResolvedValue({ id: 1, username: 'u' })
+    profilesApi.getMyProfile.mockResolvedValue({})
+    const store = useAuthStore()
+    await store.checkSession()
+    expect(store.user).not.toBeNull()
+    expect(authApi.logout).not.toHaveBeenCalled()
+  })
+
+  it('enforceIdle signs out only when idle past the limit', async () => {
+    authApi.getCurrentUser.mockResolvedValue({ id: 1, username: 'u' })
+    profilesApi.getMyProfile.mockResolvedValue({})
+    authApi.logout.mockResolvedValue()
+    const store = useAuthStore()
+    const t0 = 5_000_000_000
+    await store.signIn('u', 'p')
+    store.recordActivity(t0)
+    expect(store.enforceIdle(t0 + 3_600_000)).toBe(false)
+    expect(store.user).not.toBeNull()
+    expect(store.enforceIdle(t0 + 3_600_001)).toBe(true)
+    expect(store.user).toBeNull()
+    expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+  })
+
+  it('recordActivity throttles storage writes', async () => {
+    const store = useAuthStore()
+    store.recordActivity(1_000)
+    store.recordActivity(1_000 + 29_999)
+    expect(localStorage.getItem('vaulta-last-activity')).toBe('1000')
+    store.recordActivity(1_000 + 30_000)
+    expect(localStorage.getItem('vaulta-last-activity')).toBe('31000')
+  })
+
+  it('renewIfDue renews at most once per five minutes and only when signed in', async () => {
+    authApi.renewToken.mockResolvedValue()
+    const store = useAuthStore()
+    await store.renewIfDue(1_000)
+    expect(authApi.renewToken).not.toHaveBeenCalled()
+    store.user = { id: 1 }
+    await store.renewIfDue(1_000)
+    await store.renewIfDue(1_000 + 299_999)
+    expect(authApi.renewToken).toHaveBeenCalledTimes(1)
+    await store.renewIfDue(1_000 + 300_000)
+    expect(authApi.renewToken).toHaveBeenCalledTimes(2)
+  })
+
+  it('renewIfDue swallows a failed renewal', async () => {
+    authApi.renewToken.mockRejectedValue(new Error('nope'))
+    const store = useAuthStore()
+    store.user = { id: 1 }
+    await expect(store.renewIfDue(1_000)).resolves.toBeUndefined()
+  })
+
+  it('signOut clears the stored prefs', async () => {
+    localStorage.setItem('vaulta-remember', '1')
+    authApi.logout.mockResolvedValue()
+    const store = useAuthStore()
+    await store.signOut()
+    expect(localStorage.getItem('vaulta-remember')).toBeNull()
   })
 })
