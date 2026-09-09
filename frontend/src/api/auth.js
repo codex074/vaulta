@@ -24,6 +24,11 @@ export async function getCurrentUser() {
 // `which` to its zero value (undocumented in its swagger spec, confirmed against
 // the live backend and by reading its own frontend bundle) — never send a raw
 // user object here, always the {which, data} envelope with only `password` named.
+export async function renewToken() {
+  const response = await authorizedFetch('/api/auth/renew', { method: 'POST' })
+  if (!response.ok) throw await apiError(response)
+}
+
 export async function changePassword(currentPassword, newPassword) {
   const user = await getCurrentUser()
   const response = await authorizedFetch(`/api/users?id=${user.id}`, {

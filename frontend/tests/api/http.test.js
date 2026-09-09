@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { authorizedFetch, onUnauthorized } from '../../src/api/http.js'
+import { authorizedFetch, onUnauthorized, onRenewRequested } from '../../src/api/http.js'
 
 describe('authorizedFetch', () => {
   beforeEach(() => {
@@ -19,5 +19,26 @@ describe('authorizedFetch', () => {
     const response = await authorizedFetch('/api/resources')
     expect(callback).toHaveBeenCalled()
     expect(response.status).toBe(401)
+  })
+
+  it('notifies renew listeners when FBQ flags the token for renewal', async () => {
+    global.fetch.mockResolvedValue({ ok: true, status: 200, headers: { get: (name) => (name === 'X-Renew-Token' ? 'true' : null) } })
+    const callback = vi.fn()
+    const off = onRenewRequested(callback)
+    await authorizedFetch('/api/resources')
+    expect(callback).toHaveBeenCalledTimes(1)
+    off()
+    await authorizedFetch('/api/resources')
+    expect(callback).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not notify renew listeners without the header or without headers at all', async () => {
+    const callback = vi.fn()
+    onRenewRequested(callback)
+    global.fetch.mockResolvedValue({ ok: true, status: 200, headers: { get: () => null } })
+    await authorizedFetch('/api/resources')
+    global.fetch.mockResolvedValue({ ok: true, status: 200 })
+    await authorizedFetch('/api/resources')
+    expect(callback).not.toHaveBeenCalled()
   })
 })

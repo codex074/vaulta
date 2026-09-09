@@ -1,4 +1,5 @@
 const listeners = new Set()
+const renewListeners = new Set()
 
 export function onUnauthorized(callback) {
   listeners.add(callback)
@@ -7,6 +8,15 @@ export function onUnauthorized(callback) {
 
 export function notifyUnauthorized() {
   for (const callback of listeners) callback()
+}
+
+export function onRenewRequested(callback) {
+  renewListeners.add(callback)
+  return () => renewListeners.delete(callback)
+}
+
+export function notifyRenewRequested() {
+  for (const callback of renewListeners) callback()
 }
 
 export async function apiError(response) {
@@ -27,5 +37,7 @@ export async function authorizedFetch(url, options = {}) {
   if (response.status === 401) {
     notifyUnauthorized()
   }
+  // FBQ flags a token with under 30 minutes left; the auth store renews it.
+  if (response.headers?.get?.('X-Renew-Token') === 'true') notifyRenewRequested()
   return response
 }

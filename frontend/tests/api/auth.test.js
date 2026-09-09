@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { login, logout, getCurrentUser, changePassword } from '../../src/api/auth.js'
+import { login, logout, getCurrentUser, changePassword, renewToken } from '../../src/api/auth.js'
 
 describe('auth API', () => {
   beforeEach(() => {
@@ -58,5 +58,14 @@ describe('auth API', () => {
       .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ id: 2, username: 'codex' }) })
       .mockResolvedValueOnce({ ok: false, status: 401, json: () => Promise.resolve({ message: 'wrong password' }) })
     await expect(changePassword('wrongpass', 'newpass')).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('renewToken POSTs /api/auth/renew and throws on failure', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({ ok: true, status: 200 })
+    await renewToken()
+    expect(global.fetch.mock.calls[0][0]).toBe('/api/auth/renew')
+    expect(global.fetch.mock.calls[0][1].method).toBe('POST')
+    global.fetch.mockResolvedValueOnce({ ok: false, status: 401, statusText: 'Unauthorized', clone() { return this }, json: () => Promise.reject(new Error('x')) })
+    await expect(renewToken()).rejects.toMatchObject({ status: 401 })
   })
 })
