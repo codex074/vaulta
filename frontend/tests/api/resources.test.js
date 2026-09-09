@@ -261,7 +261,10 @@ describe('resources API', () => {
   })
 
   // A scripted XHR double: each constructed instance records what was sent
-  // and lets the test drive onload/onerror. `responses` is consumed in order.
+  // and lets the test drive onload/onerror. `responses` is consumed in
+  // order. A response may carry `afterLoad`, run synchronously right after
+  // `onload` fires in the same microtask — e.g. to abort the controller the
+  // instant a chunk finishes, before the next chunk's `send` is called.
   function scriptedXhr(responses) {
     const instances = []
     vi.stubGlobal('XMLHttpRequest', class {
@@ -283,6 +286,7 @@ describe('resources API', () => {
               inst.status = next.status
               inst.responseText = next.body ?? ''
               inst.onload?.()
+              next.afterLoad?.()
             })
           },
         }
@@ -343,7 +347,7 @@ describe('resources API', () => {
     expect(instances).toHaveLength(1)
   })
 
-  it('stops the chunk sequence when aborted', async () => {
+  it('aborts an in-flight chunk and rejects with AbortError', async () => {
     const controller = new AbortController()
     const instances = scriptedXhr([{ status: 200 }])
     const promise = uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4, signal: controller.signal })
@@ -355,6 +359,20 @@ describe('resources API', () => {
     controller.abort()
     await expect(promise).rejects.toMatchObject({ name: 'AbortError' })
     expect(instances.length).toBeLessThanOrEqual(2)
+    expect(instances[0].aborted).toBe(true)
+  })
+
+  it('does not start the next chunk once the signal is aborted', async () => {
+    const controller = new AbortController()
+    const instances = scriptedXhr([
+      { status: 200, afterLoad: () => controller.abort() },
+      { status: 200 },
+      { status: 200 },
+    ])
+    const promise = uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4, signal: controller.signal })
+    await expect(promise).rejects.toMatchObject({ name: 'AbortError' })
+    expect(instances).toHaveLength(1)
+    expect(instances[0].headers['X-File-Chunk-Offset']).toBe('0')
   })
 
   it('removePartialUploads deletes only the temp files belonging to the cancelled name', async () => {
