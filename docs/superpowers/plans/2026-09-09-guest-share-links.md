@@ -771,10 +771,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import ContextMenu from '../../src/components/ContextMenu.vue'
 import { useAuthStore } from '../../src/stores/auth.js'
 
-vi.mock('../../src/api/resources.js', () => ({
+vi.mock('../../src/api/resources.js', async (importOriginal) => ({
+  ...(await importOriginal()),
   renameItem: vi.fn(), moveItem: vi.fn(), transferItem: vi.fn(), downloadUrl: () => '/dl',
 }))
-vi.mock('../../src/api/trash.js', () => ({ softDelete: vi.fn() }))
+vi.mock('../../src/api/trash.js', async (importOriginal) => ({ ...(await importOriginal()), softDelete: vi.fn() }))
 
 describe('ContextMenu share action', () => {
   it('emits share with the entry, source and path', async () => {
@@ -1314,7 +1315,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import VaultaBrand from './VaultaBrand.vue'
 import GuestFileList from './GuestFileList.vue'
 import Lightbox from './Lightbox.vue'
-import { getShareInfo, listPublic, fetchPublicBlobUrl } from '../api/publicShare.js'
+import { getShareInfo, listPublic, fetchPublicBlobUrl, publicDownloadUrl } from '../api/publicShare.js'
 import { buildGuestUrls, mediaPlanFor } from './guestMedia.js'
 
 const props = defineProps({ hash: { type: String, required: true } })
@@ -1413,7 +1414,7 @@ async function downloadEntry(entry) {
       ? await fetchPublicBlobUrl(props.hash, entry.path, password.value)
       : null
     const a = document.createElement('a')
-    a.href = url ?? `/public/api/resources/download?${new URLSearchParams({ hash: props.hash, file: entry.path })}`
+    a.href = url ?? publicDownloadUrl(props.hash, entry.path)
     a.download = entry.name
     document.body.appendChild(a)
     a.click()
