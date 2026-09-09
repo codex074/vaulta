@@ -408,6 +408,44 @@ func TestGatePatchSharePassthroughHasNoIdentityLookup(t *testing.T) {
 	}
 }
 
+// Chunk 0 announces the whole file; an oversized file must be refused
+// before a single byte lands in the temp file.
+func TestGateChunkZeroOverTotalRejectsBeforeForwarding(t *testing.T) {
+	server, fb, _ := newGateTestServer(t, nonAdminHomeUser(7, "alice"), 500)
+	w := gateRequest(t, server.handler(), http.MethodPost, "/api/resources?path=%2Fbig.bin&source=home&override=false",
+		strings.NewReader("0123456789"), map[string]string{"X-File-Chunk-Offset": "0", "X-File-Total-Size": "1000"})
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413; body %s", w.Code, w.Body.String())
+	}
+	if len(fb.recorded()) != 0 {
+		t.Fatalf("FBQ received %d uploads, want 0", len(fb.recorded()))
+	}
+}
+
+func TestGateChunkZeroWithinTotalForwardsAndReservesChunkLength(t *testing.T) {
+	server, fb, _ := newGateTestServer(t, nonAdminHomeUser(7, "alice"), 500)
+	w := gateRequest(t, server.handler(), http.MethodPost, "/api/resources?path=%2Fbig.bin&source=home&override=false",
+		strings.NewReader("0123456789"), map[string]string{"X-File-Chunk-Offset": "0", "X-File-Total-Size": "400"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body %s", w.Code, w.Body.String())
+	}
+	if len(fb.recorded()) != 1 {
+		t.Fatalf("FBQ received %d uploads, want 1", len(fb.recorded()))
+	}
+}
+
+func TestGateLaterChunkIsNotPrechecked(t *testing.T) {
+	server, fb, _ := newGateTestServer(t, nonAdminHomeUser(7, "alice"), 500)
+	w := gateRequest(t, server.handler(), http.MethodPost, "/api/resources?path=%2Fbig.bin&source=home&override=false",
+		strings.NewReader("0123456789"), map[string]string{"X-File-Chunk-Offset": "490", "X-File-Total-Size": "1000"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (only the 10-byte chunk is reserved); body %s", w.Code, w.Body.String())
+	}
+	if len(fb.recorded()) != 1 {
+		t.Fatalf("FBQ received %d uploads, want 1", len(fb.recorded()))
+	}
+}
+
 func TestGatePatchRejectsDotDotInPaths(t *testing.T) {
 	user := nonAdminHomeUser(5, "alice")
 	server, _, _ := newGateTestServer(t, user, 1000)

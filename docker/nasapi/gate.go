@@ -132,6 +132,25 @@ func (s *apiServer) gateUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	record, _ := s.quotas.get(strconv.Itoa(user.ID))
+
+	// Chunk 0 of a chunked upload announces the whole file. Refuse an
+	// oversized file here, before any byte is written to FBQ's temp file;
+	// per-chunk reservation below remains the enforcement for the bytes
+	// actually sent.
+	if total, isFirstChunk := chunkTotal(r); isFirstChunk {
+		used, err := s.usage.used(dir)
+		if err != nil {
+			log.Printf("usage for uid %d: %v", user.ID, err)
+			writeMessage(w, http.StatusBadGateway, "File service unavailable.")
+			return
+		}
+		if used+total > record.LimitBytes {
+			io.Copy(io.Discard, r.Body)
+			writeQuotaExceeded(w, used, record.LimitBytes, total)
+			return
+		}
+	}
+
 	release, ok, err := s.usage.reserve(dir, need, record.LimitBytes)
 	if err != nil {
 		log.Printf("reserve quota for uid %d: %v", user.ID, err)
@@ -171,6 +190,20 @@ func uploadNeed(r *http.Request) (need int64, ok bool) {
 		return 0, false
 	}
 	parsed, err := strconv.ParseInt(totalSize, 10, 64)
+	if err != nil || parsed < 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+// chunkTotal reports the announced whole-file size when this request is
+// chunk 0 of FBQ's chunked-upload protocol; ok is false for unchunked
+// requests, later chunks, or an unparseable size.
+func chunkTotal(r *http.Request) (total int64, ok bool) {
+	if r.Header.Get("X-File-Chunk-Offset") != "0" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(r.Header.Get("X-File-Total-Size"), 10, 64)
 	if err != nil || parsed < 0 {
 		return 0, false
 	}
