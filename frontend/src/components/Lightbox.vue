@@ -9,7 +9,12 @@ import { documentTypeFor } from './officeDocumentType.js'
 import { lightboxKindFor, officeModeLabel } from './lightboxKind.js'
 import { pickImageSource } from './lightboxSrc.js'
 
-const props = defineProps({ entry: { type: Object, required: true } })
+const props = defineProps({
+  entry: { type: Object, required: true },
+  // Guest pages hand in ready-made URLs (direct public URLs or blob URLs);
+  // with urls set, this component never touches the authenticated API.
+  urls: { type: Object, default: null },
+})
 defineEmits(['close'])
 
 // Callers (FileTile/FileListView) always stamp the entry with its own
@@ -37,25 +42,27 @@ onBeforeUnmount(() => {
 
 const onlyOfficeAvailable = ref(false)
 onMounted(async () => {
+  if (props.urls) return
   onlyOfficeAvailable.value = Boolean(await getOnlyOfficeUrl())
 })
 
 const kind = computed(() =>
   lightboxKindFor(props.entry, { onlyOfficeAvailable: onlyOfficeAvailable.value })
 )
-const src = computed(() => downloadUrl(source.value, props.entry.path))
-const pdfSrc = computed(() => downloadUrl(source.value, props.entry.path, { inline: true }))
+const src = computed(() => props.urls ? props.urls.original : downloadUrl(source.value, props.entry.path))
+const pdfSrc = computed(() => props.urls ? props.urls.inline : downloadUrl(source.value, props.entry.path, { inline: true }))
 const imagePreviewFailed = ref(false)
 const originalLoaded = ref(false)
-const imageSrc = computed(() =>
-  pickImageSource({
+const imageSrc = computed(() => {
+  if (props.urls) return props.urls.original
+  return pickImageSource({
     hasPreview: props.entry.hasPreview,
     previewFailed: imagePreviewFailed.value,
     originalLoaded: originalLoaded.value,
   }) === 'preview'
     ? previewUrl(source.value, props.entry.path, 'large')
     : src.value
-)
+})
 
 // Always ends up showing the true original — the preview above is only an
 // instant-loading placeholder while the full-quality file downloads in the background.
@@ -64,6 +71,7 @@ watch(
   (path) => {
     imagePreviewFailed.value = false
     originalLoaded.value = false
+    if (props.urls) return
     if (!props.entry.type.startsWith('image/')) return
     const original = new Image()
     original.onload = () => {
@@ -86,6 +94,10 @@ const textFailed = ref(false)
 async function loadText(path) {
   textFailed.value = false
   textContent.value = ''
+  if (props.urls) {
+    textContent.value = props.urls.text ?? ''
+    return
+  }
   try {
     textContent.value = await getFileText(source.value, path)
   } catch {

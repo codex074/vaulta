@@ -61,4 +61,41 @@ describe('Lightbox documents', () => {
     await flushPromises()
     expect(wrapper.get('.doc-topbar').text()).toContain('ดูอย่างเดียว')
   })
+
+  it('with urls, shows the given image without calling any API', async () => {
+    const wrapper = mount(Lightbox, {
+      props: {
+        entry: { name: 'a.jpg', type: 'image/jpeg', path: '/a.jpg' },
+        urls: { original: 'blob:img', inline: null, preview: null, text: null },
+      },
+    })
+    await flushPromises()
+    expect(wrapper.get('img').attributes('src')).toBe('blob:img')
+    expect(getOnlyOfficeUrl).not.toHaveBeenCalled()
+    expect(getFileText).not.toHaveBeenCalled()
+  })
+
+  it('with urls, a pdf iframe uses the inline URL and text comes from urls.text', async () => {
+    const pdf = mount(Lightbox, {
+      props: { entry: { name: 'a.pdf', type: 'application/pdf', path: '/a.pdf' }, urls: { original: 'blob:p', inline: 'blob:p', preview: null, text: null } },
+    })
+    await flushPromises()
+    expect(pdf.get('iframe').attributes('src')).toBe('blob:p')
+    const text = mount(Lightbox, {
+      props: { entry: { name: 'n.txt', type: 'text/plain', path: '/n.txt' }, urls: { original: null, inline: null, preview: null, text: 'guest text' } },
+    })
+    await flushPromises()
+    expect(text.get('pre').text()).toBe('guest text')
+    expect(getFileText).not.toHaveBeenCalled()
+  })
+
+  it('with urls, an office document is never sent to OnlyOffice', async () => {
+    getOnlyOfficeUrl.mockResolvedValue('https://office.example.com')
+    const wrapper = mount(Lightbox, {
+      props: { entry: { name: 'r.docx', type: 'application/octet-stream', path: '/r.docx' }, urls: { original: '/dl', inline: '/dl', preview: null, text: null } },
+    })
+    await flushPromises()
+    expect(wrapper.find('.fake-editor').exists()).toBe(false)
+    expect(wrapper.get('.fallback a').attributes('href')).toBe('/dl')
+  })
 })
