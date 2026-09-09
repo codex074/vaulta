@@ -30,7 +30,7 @@ unrelated and untouched.
 
 ## Deployment
 
-Status: **deployed** at 13:05 ICT. Image `nas-webui:local`, `linux/amd64`,
+Status: **deployed** at 13:38 ICT. Image `nas-webui:local`, `linux/amd64`,
 archive MD5 `5fcf1cbab53029ad0fcfcc27a8b439a3` matched on Mac, pve2 and the
 VM. `docker compose -p ix-nas-webui up -d` recreated the container; old image
 pruned; tarballs removed. Served `assets/index-9_Tc__Kh.js` contains the
