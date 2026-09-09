@@ -37,6 +37,9 @@ own per-user scopes remain the security boundary.
   fix private drives, set quotas).
 - **Mobile-first.** Installable PWA, bottom tabs on phones, adaptive sidebar
   on iPad/desktop, light and dark themes.
+- **Sessions.** "Keep me signed in" at login keeps you signed in (FBQ tokens
+  are renewed as you use the app); otherwise Vaulta signs you out after 1
+  hour without activity. Every password field has a show/hide toggle.
 - **Guest links.** Share any file or folder as a read-only link (`/s/<hash>`)
   with an expiry and an optional password; guests browse, preview and
   download in Vaulta's own UI without an account. Backed by FBQ's share
@@ -100,6 +103,9 @@ server:
 ```
 
 FBQ reads this file at startup only, so restart it after editing.
+
+Set `auth.tokenExpirationHours: 720` so remembered sessions last; Vaulta
+renews the token on use.
 
 If you also run OnlyOffice, add FBQ's `server.internalUrl` (an address the
 OnlyOffice container can reach FBQ on) and the `integrations.office` block

@@ -178,6 +178,12 @@ To ship a code change (build → run):
   last chunk. Listings hide those temp files and cancel removes them
   (`removePartialUploads`). The nasapi gate pre-checks the whole size on chunk
   0 and still reserves per chunk.
+- **Sessions are client-policed.** FBQ has one server-wide token lifetime
+  (`auth.tokenExpirationHours`, set to 720 h on the NAS) and flags renewal
+  with `X-Renew-Token`; `sessionGuard.js` + the auth store renew (throttled
+  5 min) and enforce the 1-hour idle sign-out for unremembered sessions via
+  `localStorage` (`vaulta-remember`, `vaulta-last-activity`). Never trust
+  those keys server-side; they are UX, not security.
 - **Verification has been build/bundle-level only.** No agent this far has had
   login credentials, so the authenticated UI has never been visually checked on
   a real device, and the private-drives end-to-end checks (two real users,

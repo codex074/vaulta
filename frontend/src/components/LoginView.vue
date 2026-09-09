@@ -7,6 +7,7 @@ import PasswordInput from './PasswordInput.vue'
 const auth = useAuthStore()
 const username = ref('')
 const password = ref('')
+const remember = ref(false)
 const errorMessage = ref('')
 const submitting = ref(false)
 const host = window.location.hostname || 'nas.local'
@@ -15,7 +16,7 @@ async function onSubmit() {
   errorMessage.value = ''
   submitting.value = true
   try {
-    await auth.signIn(username.value, password.value)
+    await auth.signIn(username.value, password.value, { remember: remember.value })
   } catch (err) {
     errorMessage.value = err.status === 401 ? 'Wrong username or password.' : 'Sign-in failed. Try again.'
   } finally {
@@ -46,6 +47,12 @@ async function onSubmit() {
         <span class="field-label">Password</span>
         <PasswordInput v-model="password" autocomplete="current-password" placeholder="Your password" required />
       </label>
+
+      <label class="remember-row">
+        <input class="remember" v-model="remember" type="checkbox" />
+        <span>Keep me signed in</span>
+      </label>
+      <p v-if="auth.signedOutReason" class="login-notice" role="status">{{ auth.signedOutReason }}</p>
 
       <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
 
@@ -162,6 +169,26 @@ async function onSubmit() {
   outline: none;
   border-color: var(--signal);
   box-shadow: 0 0 0 3px rgba(255, 145, 66, 0.18);
+}
+
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--slate);
+  min-height: 44px;
+}
+.remember-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--signal);
+}
+
+.login-notice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--slate);
 }
 
 .login-error {
