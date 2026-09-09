@@ -2,10 +2,11 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Plyr from 'plyr'
 import 'plyr/dist/plyr.css'
-import { downloadUrl, previewUrl } from '../api/resources.js'
+import { downloadUrl, getFileText, previewUrl } from '../api/resources.js'
 import { getOnlyOfficeUrl } from '../api/config.js'
 import { getOfficeConfig } from '../api/office.js'
 import { documentTypeFor } from './officeDocumentType.js'
+import { lightboxKindFor, officeModeLabel } from './lightboxKind.js'
 import { pickImageSource } from './lightboxSrc.js'
 
 const props = defineProps({ entry: { type: Object, required: true } })
@@ -39,13 +40,9 @@ onMounted(async () => {
   onlyOfficeAvailable.value = Boolean(await getOnlyOfficeUrl())
 })
 
-const kind = computed(() => {
-  if (props.entry.type.startsWith('image/')) return 'image'
-  if (props.entry.type.startsWith('video/')) return 'video'
-  if (props.entry.type === 'application/pdf') return 'pdf'
-  if (onlyOfficeAvailable.value && documentTypeFor(props.entry.name)) return 'office'
-  return 'other'
-})
+const kind = computed(() =>
+  lightboxKindFor(props.entry, { onlyOfficeAvailable: onlyOfficeAvailable.value })
+)
 const src = computed(() => downloadUrl(source.value, props.entry.path))
 const pdfSrc = computed(() => downloadUrl(source.value, props.entry.path, { inline: true }))
 const imagePreviewFailed = ref(false)
@@ -80,6 +77,21 @@ watch(
 const officeUrl = ref('')
 const officeConfig = ref(null)
 const officeFailed = ref(false)
+const officeMode = computed(() => officeModeLabel(officeConfig.value))
+
+// Plain text is fetched through FileBrowser's content endpoint and shown
+// verbatim; nothing here can write it back, by design.
+const textContent = ref('')
+const textFailed = ref(false)
+async function loadText(path) {
+  textFailed.value = false
+  textContent.value = ''
+  try {
+    textContent.value = await getFileText(source.value, path)
+  } catch {
+    textFailed.value = true
+  }
+}
 
 async function loadOffice(path, name) {
   officeFailed.value = false
@@ -106,6 +118,7 @@ watch(
   () => [kind.value, props.entry.path],
   ([currentKind, path]) => {
     if (currentKind === 'office') loadOffice(path, props.entry.name)
+    if (currentKind === 'text') loadText(path)
   },
   { immediate: true }
 )
@@ -116,12 +129,18 @@ function onOfficeLoadError() {
 </script>
 
 <template>
-  <div v-if="kind === 'pdf' || (kind === 'office' && officeConfig && !officeFailed)" class="doc-panel">
+  <div
+    v-if="kind === 'pdf' || (kind === 'text' && !textFailed) || (kind === 'office' && officeConfig && !officeFailed)"
+    class="doc-panel"
+  >
     <div class="doc-topbar">
       <button class="doc-back" @click="$emit('close')">← กลับ</button>
       <span class="doc-filename">{{ entry.name }}</span>
+      <span v-if="kind === 'office'" class="doc-mode">{{ officeMode }}</span>
+      <span v-else-if="kind === 'text'" class="doc-mode">ดูอย่างเดียว</span>
     </div>
     <iframe v-if="kind === 'pdf'" class="doc-frame" :src="pdfSrc" title="PDF preview" />
+    <pre v-else-if="kind === 'text'" class="doc-frame doc-text">{{ textContent }}</pre>
     <div v-else class="doc-frame">
       <DocumentEditor
         id="vaulta-office-editor"
@@ -201,6 +220,8 @@ function onOfficeLoadError() {
   color: var(--text-muted);
 }
 .doc-frame { flex: 1; min-height: 0; border: none; }
+.doc-text { margin: 0; padding: 16px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); background: var(--bg); }
+.doc-mode { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .doc-frame :deep(#vaulta-office-editor) { width: 100%; height: 100%; }
 .doc-frame :deep(iframe) { width: 100%; height: 100%; border: none; }
 </style>

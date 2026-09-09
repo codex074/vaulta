@@ -133,3 +133,36 @@ No change is needed to `nas-webui`'s own `nginx.conf`: `/api/office/config` and 
 4. Manual: temporarily stop the OnlyOffice container, open a `.docx` — confirm the app falls back to the plain download link instead of an error state or blank screen.
 5. Manual: confirm the existing PDF preview still renders inline (not a forced download) after the `inline=true` fix, across at least one desktop and one mobile browser.
 6. Manual: confirm opening any document does not affect the existing image/video Lightbox flows (regression check on the `kind` computed's new branch ordering).
+
+## Addendum 2026-09-09: in-place editing of office documents
+
+The user asked for office files to be editable, with everyone allowed to edit
+anyone's file on the shared drive (owner-only delete is unchanged). Facts that
+shaped the change, all read from FBQ v1.5.5-stable source:
+
+- `officeClientConfigGetHandler` sets `editorConfig.mode` and
+  `document.permissions.edit` to `edit` when `viewOnly` is false, the user has
+  `Permissions.Modify`, and the extension is not in
+  `ONLYOFFICE_READONLY_FILE_EXTENSIONS` (`pages`, `numbers`, `key`). The whole
+  config is signed (`token`), so the frontend cannot force `view` per file.
+- The save callback (`processOnlyOfficeCallback`) re-checks `Modify`, resolves
+  the path inside the user's scope for the source, downloads the document from
+  the Document Server and writes it over the original path. It ignores the
+  callback's `filetype`, so legacy formats can come back as OOXML bytes.
+- The callback URL is built from `server.internalUrl`, so saves reach FBQ
+  directly on `:30334` and never pass through nginx or nasapi's quota gate.
+  Accepted: edits change size marginally and `usageTracker` re-walks within its
+  30 s TTL.
+
+Change made:
+
+1. FBQ `config.yaml`: `integrations.office.viewOnly: false`, FBQ restarted.
+2. Frontend: new `lightboxKind.js` decides the viewer. `txt`/`md`/`csv`/`log`/
+   `json` open in a built-in read-only `<pre>` viewer (content via
+   `getFileText`), so only office formats reach OnlyOffice. The document top
+   bar shows `officeModeLabel(config)`: "แก้ไขได้ · บันทึกอัตโนมัติเมื่อปิด" for an
+   edit-mode config, "ดูอย่างเดียว" otherwise. `documentTypeFor` is unchanged.
+3. Not done, by choice: owner-only editing on `share` (would need nasapi to hold
+   the JWT secret and re-sign a view config for non-owners) and a forced
+   refresh of the listing after close (the save lands seconds after the editor
+   disconnects, so an immediate refresh would show stale size/mtime anyway).

@@ -143,6 +143,15 @@ To ship a code change (build → run):
   config's `FILEBROWSER_ADMIN_PASSWORD` (that is only the seed). Authenticated
   API scripting as admin needs credentials from the human or a throwaway test
   user made through the UI.
+- **OnlyOffice editing is decided by FBQ, not by this app.** `GET
+  /api/office/config` returns a JWT-signed config whose `editorConfig.mode` is
+  `edit` whenever `integrations.office.viewOnly` is `false` and the user has
+  `modify` (all Vaulta users do); the client cannot downgrade it. "Only office
+  files are editable" is therefore enforced by `lightboxKind.js` routing
+  txt/md/csv/log/json to the built-in `<pre>` viewer so they never reach
+  OnlyOffice. Saves go Document Server → FBQ `/api/office/callback` via
+  `server.internalUrl`, bypassing nginx and nasapi's quota gate (accepted
+  gap). `viewOnly: false` has been live since 2026-09-09.
 - **Verification has been build/bundle-level only.** No agent this far has had
   login credentials, so the authenticated UI has never been visually checked on
   a real device, and the private-drives end-to-end checks (two real users,

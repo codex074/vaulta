@@ -23,9 +23,12 @@ own per-user scopes remain the security boundary.
   per-file or whole-batch cancel.
 - **Starred and Trash.** Star anything; deleted files go to a `.trash` folder
   and can be restored or deleted forever. Owner-only delete on the shared drive.
-- **Previews.** Image, video (Plyr player) and PDF lightbox; folder covers show
-  a 2x2 collage of the folder's own photos; `docx`/`xlsx`/`pptx`/`txt`/`md`
-  open view-only in OnlyOffice when a Document Server is configured.
+- **Previews and editing.** Image, video (Plyr player) and PDF lightbox;
+  folder covers show a 2x2 collage of the folder's own photos; `txt`/`md`/
+  `csv`/`log`/`json` open in a built-in read-only text viewer. With an
+  OnlyOffice Document Server configured, `docx`/`xlsx`/`pptx` (and the other
+  Word/Cell/Slide formats OnlyOffice knows) open in OnlyOffice and can be
+  edited in place; changes save automatically when the document is closed.
 - **Accounts.** Display-name profiles keyed by FBQ's immutable user ID, change
   password, and an admin "Manage users" dialog (create/delete users, assign or
   fix private drives, set quotas).
@@ -90,10 +93,29 @@ server:
 
 FBQ reads this file at startup only, so restart it after editing.
 
-If you also run OnlyOffice, add FBQ's `http.internalUrl` (an address the
+If you also run OnlyOffice, add FBQ's `server.internalUrl` (an address the
 OnlyOffice container can reach FBQ on) and the `integrations.office` block
-with the same JWT secret as the Document Server. Set `viewOnly: true` to keep
-documents read-only. The exact keys are documented in
+with the same JWT secret as the Document Server:
+
+```yaml
+integrations:
+  office:
+    url: https://office.example.com        # what browsers load
+    internalUrl: http://<fbq-host>:8095    # how FBQ reaches the Document Server
+    secret: <same JWT secret as the Document Server>
+    viewOnly: false                        # true = read-only for everyone
+```
+
+With `viewOnly: false`, FBQ decides per file: anyone whose FBQ account has
+the `modify` permission (every user Vaulta creates) gets an editable session
+for any OnlyOffice-supported format except `pages`/`numbers`/`key`. Vaulta
+keeps plain-text formats out of OnlyOffice so only office documents are
+editable. Saves travel from the Document Server straight to FBQ's callback
+endpoint, bypassing Vaulta's nginx and the quota gate; the storage numbers
+catch up on the next usage refresh. Prefer editing `docx`/`xlsx`/`pptx`:
+FBQ writes whatever bytes OnlyOffice returns over the original file without
+checking the format, so legacy formats like `doc`/`odt` may be rewritten as
+OOXML. The exact keys are documented in
 `docs/superpowers/specs/2026-09-08-onlyoffice-document-viewer-design.md`.
 
 ## Build the image
