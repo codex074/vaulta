@@ -36,6 +36,10 @@ own per-user scopes remain the security boundary.
   fix private drives, set quotas).
 - **Mobile-first.** Installable PWA, bottom tabs on phones, adaptive sidebar
   on iPad/desktop, light and dark themes.
+- **Guest links.** Share any file or folder as a read-only link (`/s/<hash>`)
+  with an expiry and an optional password; guests browse, preview and
+  download in Vaulta's own UI without an account. Backed by FBQ's share
+  system.
 
 ## How it works
 
@@ -46,7 +50,8 @@ Browser ──> nginx :8090 ──┬── /            static Vue SPA (PWA)
                           ├── /api/*       ──> FileBrowser Quantum (default 127.0.0.1:30334)
                           ├── /api/resources (POST/PATCH/DELETE only)
                           │                 ──> nasapi :9190 (quota gate) ──> FileBrowser Quantum
-                          └── /nasapi/*    ──> nasapi :9190 (storage, profiles, ownership, quotas, config)
+                          ├── /nasapi/*    ──> nasapi :9190 (storage, profiles, ownership, quotas, config)
+                          └── /public/api/*  ──> FileBrowser Quantum (guest share links, no login)
 ```
 
 - **nginx** serves the built SPA and reverse-proxies `/api/*` to FBQ.

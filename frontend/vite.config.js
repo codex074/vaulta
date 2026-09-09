@@ -34,7 +34,7 @@ export default defineConfig({
         // serves the cached index.html instead of letting the real request
         // reach the backend, so the "PDF viewer" silently shows the app
         // shell again instead of the document.
-        navigateFallbackDenylist: [/^\/api\//, /^\/nasapi\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/nasapi\//, /^\/public\//],
       },
     }),
   ],
@@ -47,6 +47,10 @@ export default defineConfig({
       },
       '/nasapi': {
         target: process.env.VITE_NASAPI_TARGET || 'http://192.168.1.22:8090',
+        changeOrigin: true,
+      },
+      '/public': {
+        target: process.env.VITE_API_TARGET || 'http://192.168.1.22:30334',
         changeOrigin: true,
       },
     },

@@ -38,6 +38,10 @@ other worktrees may be on other branches.
   resource call is **source-first**: `listDirectory(source, path)`,
   `uploadFile(source, path, file, onProgress, { signal })`, etc. `source` is
   `'home'` (private drive) or `'share'` (the shared area) — never defaulted.
+  `share.js` is the owner-side client (create/list/revoke links, authenticated
+  like the rest of the app); `publicShare.js` is the guest-side client — a
+  plain `fetch` against `/public/api/*` with no auth cookie, sending
+  `X-SHARE-PASSWORD` when the link is password-protected.
 - `frontend/src/stores/*.js` — Pinia stores (`files` holds `source` +
   `currentPath`; `quota`, `auth`, `starred`, `trash`, `theme`).
 - `frontend/src/components/*.vue` — UI. Pure logic is factored into tested
@@ -161,6 +165,9 @@ To ship a code change (build → run):
   OnlyOffice. Saves go Document Server → FBQ `/api/office/callback` via
   `server.internalUrl`, bypassing nginx and nasapi's quota gate (accepted
   gap). `viewOnly: false` has been live since 2026-09-09.
+- **Password shares can only be read with a request header** — the share
+  token is never given to guests, so `<img>`/`<video>` can't authenticate;
+  `guestMedia.js` fetches blobs instead and video is download-only.
 - **Verification has been build/bundle-level only.** No agent this far has had
   login credentials, so the authenticated UI has never been visually checked on
   a real device, and the private-drives end-to-end checks (two real users,
