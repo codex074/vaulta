@@ -72,6 +72,9 @@ function onFileInputChange(event) {
   event.target.value = ''
 }
 
+// Session guard covers pointer/keyboard/scroll input plus tab visibility;
+// uploads run long after the last click/keypress, so the upload progress
+// callback below also feeds auth.recordActivity() directly.
 let teardownSessionGuard = () => {}
 onMounted(async () => {
   await auth.checkSession()
@@ -160,7 +163,7 @@ async function handleFiles(items) {
     if (entry.status === 'cancelled') continue
     entry.status = 'uploading'
     try {
-      await uploadFile(source, fullPath, file, (pct) => { entry.progress = pct }, { signal: entry.controller.signal })
+      await uploadFile(source, fullPath, file, (pct) => { entry.progress = pct; auth.recordActivity() }, { signal: entry.controller.signal })
       entry.status = 'done'
       if (source === 'share') {
         try {

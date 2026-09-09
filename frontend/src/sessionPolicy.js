@@ -6,11 +6,22 @@ export const ACTIVITY_WRITE_INTERVAL_MS = 30_000
 export const REMEMBER_KEY = 'vaulta-remember'
 export const LAST_ACTIVITY_KEY = 'vaulta-last-activity'
 
+export function storageAvailable(storage) {
+  const probeKey = 'vaulta-probe'
+  try {
+    storage.setItem(probeKey, '1')
+    storage.removeItem(probeKey)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function readSessionPrefs(storage) {
   try {
     const remember = storage.getItem(REMEMBER_KEY) === '1'
     const raw = storage.getItem(LAST_ACTIVITY_KEY)
-    const parsed = raw === null ? NaN : Number(raw)
+    const parsed = raw === null || raw === '' ? NaN : Number(raw)
     return { remember, lastActivity: Number.isFinite(parsed) ? parsed : null }
   } catch {
     return { remember: false, lastActivity: null }

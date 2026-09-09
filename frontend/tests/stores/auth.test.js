@@ -1,5 +1,5 @@
 // frontend/tests/stores/auth.test.js
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAuthStore } from '../../src/stores/auth.js'
 import * as authApi from '../../src/api/auth.js'
@@ -25,7 +25,14 @@ describe('auth store', () => {
     localStorage.clear()
   })
 
+  afterEach(() => vi.restoreAllMocks())
+
   it('checkSession sets user on success', async () => {
+    // A recent lastActivity models a continuing session (prefs already
+    // written by a prior signIn/recordActivity) — distinct from the
+    // "cookie present but no prefs at all" case covered below, which now
+    // signs out defensively.
+    localStorage.setItem('vaulta-last-activity', String(Date.now()))
     authApi.getCurrentUser.mockResolvedValue({ id: 2, username: 'codex' })
     profilesApi.getMyProfile.mockResolvedValue({ uid: '2', username: 'codex', displayName: 'Codex Home' })
     const store = useAuthStore()
@@ -37,6 +44,7 @@ describe('auth store', () => {
   })
 
   it('checkSession leaves user null on 401', async () => {
+    localStorage.setItem('vaulta-last-activity', String(Date.now()))
     authApi.getCurrentUser.mockRejectedValue({ status: 401 })
     const store = useAuthStore()
     await store.checkSession()
@@ -71,6 +79,7 @@ describe('auth store', () => {
   })
 
   it('falls back to username while keeping the numeric UID when the profile service is unavailable', async () => {
+    localStorage.setItem('vaulta-last-activity', String(Date.now()))
     authApi.getCurrentUser.mockResolvedValue({ id: 7, username: 'legacy-login' })
     profilesApi.getMyProfile.mockRejectedValue({ status: 502 })
     const store = useAuthStore()
@@ -220,5 +229,83 @@ describe('auth store', () => {
     const store = useAuthStore()
     await store.signOut()
     expect(localStorage.getItem('vaulta-remember')).toBeNull()
+  })
+
+  it('idle sign-out keeps stale prefs when logout fails, so the next check signs out again', async () => {
+    localStorage.setItem('vaulta-remember', '0')
+    localStorage.setItem('vaulta-last-activity', String(Date.now() - 2 * 3_600_000))
+    authApi.logout.mockRejectedValue(new Error('network down'))
+    const store = useAuthStore()
+    await store.checkSession()
+    expect(store.user).toBeNull()
+    expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+    expect(localStorage.getItem('vaulta-last-activity')).not.toBeNull()
+
+    authApi.getCurrentUser.mockClear()
+    store.checked = false
+    await store.checkSession()
+    expect(authApi.getCurrentUser).not.toHaveBeenCalled()
+    expect(store.user).toBeNull()
+    expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+  })
+
+  it('checkSession signs out when storage is available but no prefs exist at all (cookie-only state)', async () => {
+    authApi.logout.mockResolvedValue()
+    const store = useAuthStore()
+    await store.checkSession()
+    expect(authApi.getCurrentUser).not.toHaveBeenCalled()
+    expect(authApi.logout).toHaveBeenCalled()
+    expect(store.user).toBeNull()
+    expect(store.signedOutReason).toBe('Signed out after 1 hour of inactivity.')
+  })
+
+  it('enforces the idle limit through the memory mirror when storage throws', () => {
+    authApi.logout.mockResolvedValue()
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('blocked') })
+    const store = useAuthStore()
+    store.user = { id: 1 }
+    const t0 = 5_000_000_000
+    store.recordActivity(t0)
+    expect(store.enforceIdle(t0 + 3_600_000)).toBe(false)
+    expect(store.user).not.toBeNull()
+    expect(store.enforceIdle(t0 + 3_600_001)).toBe(true)
+    expect(store.user).toBeNull()
+  })
+
+  it('renewIfDue signs out without renewing when the session is idle-expired', async () => {
+    authApi.logout.mockResolvedValue()
+    localStorage.setItem('vaulta-remember', '0')
+    localStorage.setItem('vaulta-last-activity', String(Date.now() - 2 * 3_600_000))
+    const store = useAuthStore()
+    store.user = { id: 1 }
+    await store.renewIfDue(Date.now())
+    expect(authApi.renewToken).not.toHaveBeenCalled()
+    expect(store.user).toBeNull()
+  })
+
+  it('signIn clears signedOutReason even when getMyProfile rejects (non-401)', async () => {
+    authApi.login.mockResolvedValue()
+    authApi.getCurrentUser.mockResolvedValue({ id: 3, username: 'u' })
+    profilesApi.getMyProfile.mockRejectedValue({ status: 502 })
+    const store = useAuthStore()
+    store.signedOutReason = 'Signed out after 1 hour of inactivity.'
+    await store.signIn('u', 'p')
+    expect(store.signedOutReason).toBe('')
+    expect(store.user).toMatchObject({ uid: '3', username: 'u' })
+  })
+
+  it('signIn clears signedOutReason before loadIdentity, even when identity loading itself fails', async () => {
+    // Unlike the getMyProfile case above (which loadIdentity swallows
+    // internally and so doesn't discriminate ordering), a getCurrentUser
+    // rejection propagates out of signIn — this only stays cleared if the
+    // assignment happens before the await, per review item #10.
+    authApi.login.mockResolvedValue()
+    authApi.getCurrentUser.mockRejectedValue(new Error('boom'))
+    const store = useAuthStore()
+    store.signedOutReason = 'Signed out after 1 hour of inactivity.'
+    await expect(store.signIn('u', 'p')).rejects.toThrow('boom')
+    expect(store.signedOutReason).toBe('')
   })
 })

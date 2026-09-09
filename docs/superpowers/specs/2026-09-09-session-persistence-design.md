@@ -40,8 +40,13 @@ logout, which clears the cookie). Previously the same exposure was 2 hours.
 - Storage keys `vaulta-remember` (`'1'`/`'0'`) and `vaulta-last-activity`
   (epoch ms as string).
 - `readSessionPrefs(storage) → { remember: boolean, lastActivity: number | null }`
-  (missing/garbled → `remember: false`, `lastActivity: null`; storage throwing → same).
+  (missing/garbled/empty-string → `remember: false`, `lastActivity: null`; storage throwing → same).
 - `writeSessionPrefs(storage, { remember, lastActivity })`, `clearSessionPrefs(storage)`.
+- `storageAvailable(storage) → boolean`: probes a throwaway `'vaulta-probe'`
+  key (`setItem` + `removeItem`); false if either throws. Lets the auth store
+  distinguish "no prefs because storage is unreachable" (fall back to the
+  in-memory mirror) from "no prefs because none were ever written" (fail
+  closed — see Error handling).
 - `isIdleExpired({ remember, lastActivity }, now, limit = IDLE_LIMIT_MS)` →
   `!remember && lastActivity !== null && now - lastActivity > limit`.
 - `shouldWriteActivity(lastActivity, now, interval = ACTIVITY_WRITE_INTERVAL_MS)` →
@@ -61,23 +66,48 @@ logout, which clears the cookie). Previously the same exposure was 2 hours.
   `apiError` on failure.
 
 ### `frontend/src/stores/auth.js`
-- State gains `signedOutReason: ''` and (non-persisted) `lastRenewAt: null`.
-- `signIn(username, password, { remember = false } = {})`: login, then
-  `writeSessionPrefs(storage, { remember, lastActivity: now })`, then load identity.
-- `checkSession()`: read prefs; if `isIdleExpired(prefs, now)` → best-effort
-  `logout()`, `clearSessionPrefs`, `user = null`,
-  `signedOutReason = 'Signed out after 1 hour of inactivity.'`; else load
-  identity as today and, on success, record activity `now`.
-- `signOut()`: `logout()`, `clearSessionPrefs`, `user = null`.
-- `recordActivity(now = Date.now())`: if `shouldWriteActivity(prefs.lastActivity, now)`
-  write `lastActivity = now` (keeping `remember`).
-- `enforceIdle(now = Date.now())`: if `user` and `isIdleExpired(prefs, now)` →
-  same as the expired branch of `checkSession` (returns `true` when it signed out).
-- `renewIfDue(now = Date.now())`: if `user` and `shouldRenew(lastRenewAt, now)`
-  → `lastRenewAt = now`, `await renewToken()` (errors swallowed: a failed renew
-  just means the next 401 shows the login screen).
+- State gains `signedOutReason: ''`, (non-persisted) `lastRenewAt: null`, and
+  an in-memory mirror of the prefs (`lastActivity: null`, `remember: false`)
+  that is authoritative when storage throws.
+- `currentPrefs()`: `storageAvailable(storage())` ? `readSessionPrefs(storage())`
+  : `{ remember: this.remember, lastActivity: this.lastActivity }`. Every
+  action below reads prefs through this helper, never `readSessionPrefs`
+  directly.
+- `signIn(username, password, { remember = false } = {})`: login, set the
+  mirror (`this.remember`, `this.lastActivity = now`) and
+  `writeSessionPrefs(storage, { remember, lastActivity: now })`, clear
+  `signedOutReason` **before** `loadIdentity()` (so it stays cleared even if
+  identity loading itself throws), then load identity.
+- `checkSession()`: `prefs = currentPrefs()`; expired if `isIdleExpired(prefs, now)`
+  OR (`storageAvailable(storage())` && `!prefs.remember` && `prefs.lastActivity === null`)
+  — the second clause is the "cookie present but no prefs" case (legacy
+  session, storage purged independently of the cookie, or a previous
+  `idleSignOut` whose `logout()` failed); on either, `await idleSignOut()`
+  and return. Otherwise load identity as today and, on success, record
+  activity `now`.
+- `signOut()`: `logout()` with its rejection swallowed (`console.warn`) so
+  the caller never sees an unhandled rejection; `finally` clears prefs
+  (storage AND mirror), `user`, `signedOutReason`, `lastRenewAt`.
+- `recordActivity(now = Date.now())`: always updates the mirror
+  (`this.lastActivity = now`, `this.remember` synced from `currentPrefs()`);
+  writes to storage only when `shouldWriteActivity(<stored-or-mirrored
+  lastActivity>, now)`.
+- `idleSignOut()`: synchronously sets `signedOutReason`, `user = null`,
+  `lastRenewAt = null`; then calls `logout()` and clears prefs (storage AND
+  mirror) **only if it resolves** — on rejection the stale prefs are kept on
+  purpose so the next `checkSession`/`enforceIdle` re-evaluates as expired.
+  Returns the promise so `checkSession` can `await` it while `enforceIdle`
+  fires it without awaiting.
+- `enforceIdle(now = Date.now())`: if `user` and `isIdleExpired(currentPrefs(), now)`
+  → `idleSignOut()`, returns `true`.
+- `renewIfDue(now = Date.now())`: first checks `enforceIdle(now)` and returns
+  if it signed out (an idle-expired session is never renewed); otherwise, if
+  `user` and `shouldRenew(lastRenewAt, now)` → `lastRenewAt = now`,
+  `await renewToken()` (errors swallowed: a failed renew just means the next
+  401 shows the login screen).
 - Storage is `window.localStorage`, accessed only through `sessionPolicy.js`
-  helpers so a throwing storage (private mode) degrades to "remember: false".
+  helpers; a throwing storage (private mode, quota, Safari ITP) falls back to
+  the in-memory mirror above rather than just "remember: false".
 
 ### `frontend/src/sessionGuard.js` (tested with fake timers)
 `installSessionGuard(auth, { win = window, doc = document } = {}) → teardown`:
@@ -90,6 +120,10 @@ logout, which clears the cookie). Previously the same exposure was 2 hours.
 - Teardown removes listeners, clears the interval, unsubscribes.
 `App.vue` installs it `onMounted` (after `checkSession`) and tears it down
 `onBeforeUnmount`. The guest app does not install it.
+- Uploads count as activity too, independent of the guard: `App.vue`'s upload
+  progress callback (`handleFiles`, per queued item) calls
+  `auth.recordActivity()` on every progress tick, since a large upload can run
+  well past the last pointer/keyboard/scroll event the guard listens for.
 
 ### `frontend/src/components/PasswordInput.vue` (tested)
 - `v-model` string; `inheritAttrs: false`, all attrs (placeholder,
@@ -109,10 +143,23 @@ logout, which clears the cookie). Previously the same exposure was 2 hours.
 
 ### Error handling
 - `renewToken` failure: swallowed (logged to console); the next 401 shows login.
-- Storage unavailable: `remember` reads as false → idle sign-out applies; the
-  app never throws because of storage.
-- Logout request failing during idle sign-out: still clear local state and
-  show the login screen (cookie may linger until it expires; same as today).
+- Storage unavailable: `sessionPolicy.storageAvailable(storage)` probes a
+  throwaway key before trusting `localStorage`. When it's unreachable (private
+  mode, quota, Safari ITP purge) the auth store falls back to an in-memory
+  mirror (`lastActivity`, `remember` on the store) that is authoritative for
+  the current tab, so `recordActivity`/`enforceIdle` still work; the app never
+  throws because of storage. A related fail-closed rule: if storage *is*
+  reachable but holds no prefs at all while a session looks otherwise valid
+  (legacy session predating this feature, prefs purged independently of the
+  cookie, or the failed-logout case below), `checkSession` treats that as
+  expired rather than silently re-adopting a cookie with no activity record.
+- Logout request failing during idle sign-out: local UI state (`user`,
+  `signedOutReason`) is still cleared synchronously so the login screen shows
+  immediately, but the stored/mirrored prefs (`vaulta-remember`,
+  `vaulta-last-activity`) are deliberately *kept* rather than cleared. That
+  way the next `checkSession` (or `enforceIdle`) still sees an idle-expired
+  or prefs-inconsistent state and signs out again, instead of the cleared
+  prefs making a still-valid cookie look like a fresh, trusted session.
 
 ## Non-goals
 Server-side per-login lifetimes, multi-device session lists, "sign out

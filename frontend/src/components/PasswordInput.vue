@@ -11,6 +11,9 @@ const visible = ref(false)
 <template>
   <span class="password-field">
     <input
+      spellcheck="false"
+      autocapitalize="none"
+      autocorrect="off"
       v-bind="$attrs"
       :type="visible ? 'text' : 'password'"
       :value="modelValue"

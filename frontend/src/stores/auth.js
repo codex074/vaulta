@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { login, logout, getCurrentUser, changePassword as changePasswordApi, renewToken } from '../api/auth.js'
 import { getMyProfile, updateMyDisplayName } from '../api/profiles.js'
-import { readSessionPrefs, writeSessionPrefs, clearSessionPrefs, isIdleExpired, shouldWriteActivity, shouldRenew } from '../sessionPolicy.js'
+import { readSessionPrefs, writeSessionPrefs, clearSessionPrefs, isIdleExpired, shouldWriteActivity, shouldRenew, storageAvailable } from '../sessionPolicy.js'
 
 export const IDLE_SIGNOUT_MESSAGE = 'Signed out after 1 hour of inactivity.'
 const storage = () => window.localStorage
@@ -19,15 +19,30 @@ async function loadIdentity() {
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: () => ({ user: null, checked: false, signedOutReason: '', lastRenewAt: null }),
+  state: () => ({ user: null, checked: false, signedOutReason: '', lastRenewAt: null, lastActivity: null, remember: false }),
   getters: {
     isAdmin: (state) => Boolean(state.user?.permissions?.admin),
     hasHomeDrive: (state) => Boolean(state.user?.scopes?.some((scope) => scope.name === 'home')),
   },
   actions: {
+    // Storage prefs are authoritative when reachable; when storage throws
+    // (private mode, quota, Safari ITP purge) this in-memory mirror is the
+    // fallback so idle enforcement still works for the current tab.
+    currentPrefs() {
+      if (storageAvailable(storage())) return readSessionPrefs(storage())
+      return { remember: this.remember, lastActivity: this.lastActivity }
+    },
     async checkSession() {
       try {
-        if (isIdleExpired(readSessionPrefs(storage()), Date.now())) {
+        const prefs = this.currentPrefs()
+        const now = Date.now()
+        // A valid FBQ cookie can outlive the prefs that track it (legacy
+        // session from before this feature, storage purged by Safari ITP,
+        // or a previous idleSignOut whose logout() call failed). Treat that
+        // combination as expired too, rather than silently re-adopting a
+        // cookie we have no activity record for.
+        const cookieWithoutPrefs = storageAvailable(storage()) && !prefs.remember && prefs.lastActivity === null
+        if (isIdleExpired(prefs, now) || cookieWithoutPrefs) {
           await this.idleSignOut()
           return
         }
@@ -41,36 +56,56 @@ export const useAuthStore = defineStore('auth', {
     },
     async signIn(username, password, { remember = false } = {}) {
       await login(username, password)
-      writeSessionPrefs(storage(), { remember, lastActivity: Date.now() })
-      this.user = await loadIdentity()
+      const now = Date.now()
+      this.remember = remember
+      this.lastActivity = now
+      writeSessionPrefs(storage(), { remember, lastActivity: now })
       this.signedOutReason = ''
+      this.user = await loadIdentity()
     },
     async signOut() {
       try {
         await logout()
+      } catch (err) {
+        console.warn('sign-out request failed', err)
       } finally {
         clearSessionPrefs(storage())
+        this.remember = false
+        this.lastActivity = null
         this.user = null
+        this.signedOutReason = ''
+        this.lastRenewAt = null
       }
     },
     idleSignOut() {
       this.signedOutReason = IDLE_SIGNOUT_MESSAGE
-      clearSessionPrefs(storage())
       this.user = null
-      return logout().catch(() => {
-        // cookie lingers until FBQ expires it; the login screen still shows
-      })
+      this.lastRenewAt = null
+      return logout()
+        .then(() => {
+          clearSessionPrefs(storage())
+          this.remember = false
+          this.lastActivity = null
+        })
+        .catch(() => {
+          // Logout failed — keep the stale prefs (storage AND mirror) so the
+          // next checkSession/enforceIdle re-evaluates this session as
+          // expired instead of silently re-adopting a still-valid cookie.
+        })
     },
     recordActivity(now = Date.now()) {
-      const prefs = readSessionPrefs(storage())
+      const prefs = this.currentPrefs()
+      this.lastActivity = now
+      this.remember = prefs.remember
       if (shouldWriteActivity(prefs.lastActivity, now)) writeSessionPrefs(storage(), { remember: prefs.remember, lastActivity: now })
     },
     enforceIdle(now = Date.now()) {
-      if (!this.user || !isIdleExpired(readSessionPrefs(storage()), now)) return false
+      if (!this.user || !isIdleExpired(this.currentPrefs(), now)) return false
       this.idleSignOut()
       return true
     },
     async renewIfDue(now = Date.now()) {
+      if (this.enforceIdle(now)) return
       if (!this.user || !shouldRenew(this.lastRenewAt, now)) return
       this.lastRenewAt = now
       try {

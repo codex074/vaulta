@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   IDLE_LIMIT_MS, RENEW_MIN_INTERVAL_MS, ACTIVITY_WRITE_INTERVAL_MS, REMEMBER_KEY, LAST_ACTIVITY_KEY,
   readSessionPrefs, writeSessionPrefs, clearSessionPrefs, isIdleExpired, shouldWriteActivity, shouldRenew,
+  storageAvailable,
 } from '../src/sessionPolicy.js'
 
 function memoryStorage(initial = {}) {
@@ -32,6 +33,9 @@ describe('session prefs storage', () => {
     expect(readSessionPrefs(memoryStorage())).toEqual({ remember: false, lastActivity: null })
     expect(readSessionPrefs(memoryStorage({ [REMEMBER_KEY]: 'yes', [LAST_ACTIVITY_KEY]: 'soon' }))).toEqual({ remember: false, lastActivity: null })
   })
+  it('treats a stored empty string for last activity as null', () => {
+    expect(readSessionPrefs(memoryStorage({ [LAST_ACTIVITY_KEY]: '' }))).toEqual({ remember: false, lastActivity: null })
+  })
   it('never throws when storage is unavailable', () => {
     expect(readSessionPrefs(throwingStorage)).toEqual({ remember: false, lastActivity: null })
     expect(() => writeSessionPrefs(throwingStorage, { remember: true, lastActivity: 1 })).not.toThrow()
@@ -53,6 +57,15 @@ describe('isIdleExpired', () => {
   it('never expires a remembered session or one with no recorded activity', () => {
     expect(isIdleExpired({ remember: true, lastActivity: now - 10 * IDLE_LIMIT_MS }, now)).toBe(false)
     expect(isIdleExpired({ remember: false, lastActivity: null }, now)).toBe(false)
+  })
+})
+
+describe('storageAvailable', () => {
+  it('is true when a probe write/remove succeeds', () => {
+    expect(storageAvailable(memoryStorage())).toBe(true)
+  })
+  it('is false when storage throws', () => {
+    expect(storageAvailable(throwingStorage)).toBe(false)
   })
 })
 
