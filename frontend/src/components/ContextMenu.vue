@@ -15,7 +15,7 @@ const props = defineProps({
   path: { type: String, required: true },
   view: { type: String, default: 'browse' },
 })
-const emit = defineEmits(['close', 'changed'])
+const emit = defineEmits(['close', 'changed', 'share'])
 const files = useFilesStore()
 const trash = useTrashStore()
 const auth = useAuthStore()
@@ -77,6 +77,10 @@ function doRestore() {
 function doDeleteForever() {
   return refreshAfter(() => trash.deleteForeverItem(props.entry))
 }
+function doShare() {
+  emit('share', { entry: props.entry, source: source.value, path: props.path })
+  emit('close')
+}
 </script>
 
 <template>
@@ -102,6 +106,7 @@ function doDeleteForever() {
         <button @click="moving = true">Move</button>
         <button v-if="showCopyToOther" @click="doCopyToOther">{{ copyLabel }}</button>
         <a :href="downloadUrl(source, path)" target="_blank" rel="noopener noreferrer">Download</a>
+        <button class="share-link" @click="doShare">Share link</button>
         <button v-if="canDelete" class="danger" @click="doDelete">Delete</button>
         <span v-else class="hint">Only {{ entry.uploadedByUsername }} or an admin can delete this</span>
       </template>

@@ -24,6 +24,7 @@ import ErrorToast from './components/ErrorToast.vue'
 import ContextMenu from './components/ContextMenu.vue'
 import UiIcon from './components/UiIcon.vue'
 import Lightbox from './components/Lightbox.vue'
+import ShareDialog from './components/ShareDialog.vue'
 
 const auth = useAuthStore()
 const files = useFilesStore()
@@ -38,6 +39,7 @@ watch(() => theme.current, (value) => {
 const showNewFolder = ref(false)
 const activeMenu = ref(null)
 const previewing = ref(null)
+const sharing = ref(null)
 const uploads = reactive([])
 const searchQuery = ref('')
 const view = ref('browse')
@@ -301,8 +303,10 @@ async function onEmptyTrash() {
       :view="view"
       @close="activeMenu = null"
       @changed="onEntryChanged"
+      @share="sharing = $event"
     />
     <Lightbox v-if="previewing" :entry="previewing" @close="previewing = null" />
+    <ShareDialog v-if="sharing" :entry="sharing.entry" :source="sharing.source" :path="sharing.path" @close="sharing = null" />
   </div>
 </template>
 
