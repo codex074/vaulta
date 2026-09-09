@@ -14,8 +14,11 @@ sidecar. One Docker image, two processes (nginx + `nasapi`). `README.md` covers
 build/run/architecture; don't restate it — read it.
 
 **All work lives on branch `nas-webui-polish`, and that is what production
-runs.** `main` is far behind; do not target it. This repo is checked out as a
-git worktree; other worktrees may be on other branches.
+runs.** `main` is fast-forwarded to it at each push; commit on
+`nas-webui-polish`, then `git merge --ff-only nas-webui-polish` on `main`.
+The GitHub remote is `https://github.com/codex074/vaulta` (`origin`), with
+`main` as the default branch. This repo is checked out as a git worktree;
+other worktrees may be on other branches.
 
 ## Where the truth already is (don't duplicate — read these)
 
