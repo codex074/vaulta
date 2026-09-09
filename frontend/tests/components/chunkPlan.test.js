@@ -5,8 +5,8 @@ import {
 } from '../../src/components/chunkPlan.js'
 
 describe('chunk planning', () => {
-  it('uses 25 MiB chunks and three attempts', () => {
-    expect(CHUNK_SIZE).toBe(25 * 1024 * 1024)
+  it('uses 10 MiB chunks and three attempts', () => {
+    expect(CHUNK_SIZE).toBe(10 * 1024 * 1024)
     expect(MAX_CHUNK_ATTEMPTS).toBe(3)
   })
   it('only chunks files strictly larger than the chunk size', () => {

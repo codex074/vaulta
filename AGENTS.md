@@ -172,7 +172,7 @@ To ship a code change (build → run):
   `publicapi`); on the LAN the header is absent so there is no limit.
 - **Cloudflare drops request bodies over 100 MB before they reach the NAS**
   (413 from the edge, nothing in nginx/FBQ logs). `uploadFile` therefore sends
-  files over `CHUNK_SIZE` (25 MiB, `chunkPlan.js`) with FBQ's
+  files over `CHUNK_SIZE` (10 MiB, `chunkPlan.js`) with FBQ's
   `X-File-Chunk-Offset`/`X-File-Total-Size` headers on the same POST; FBQ
   writes `<target>.<md5>.uploading.tmp` beside the target and renames on the
   last chunk. Listings hide those temp files and cancel removes them

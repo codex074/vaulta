@@ -322,22 +322,39 @@ describe('resources API', () => {
     expect(instances[0].body).toBeInstanceOf(File)
   })
 
-  it('retries a chunk after a 5xx or network error, then succeeds', async () => {
+  it('retries a chunk after a 5xx or network error by restarting the whole upload at offset 0', async () => {
+    // FBQ deletes the chunk temp file when a chunk body fails mid-stream, so
+    // resuming at the same offset would resend a hole-filled file. A failure
+    // on chunk 2 (offset 4) must restart the whole upload from offset 0.
     const instances = scriptedXhr([
       { status: 200 },
       { networkError: true },
-      { status: 502, body: '{"message":"bad gateway"}' },
+      { status: 200 },
       { status: 200 },
       { status: 200 },
     ])
     await uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 })
-    expect(instances.map((i) => i.headers['X-File-Chunk-Offset'])).toEqual(['0', '4', '4', '4', '8'])
+    expect(instances.map((i) => i.headers['X-File-Chunk-Offset'])).toEqual(['0', '4', '0', '4', '8'])
   })
 
-  it('gives up after three attempts on the same chunk', async () => {
-    scriptedXhr([{ networkError: true }, { networkError: true }, { networkError: true }, { status: 200 }])
+  it('resends the same slice sizes on a restarted attempt', async () => {
+    const instances = scriptedXhr([
+      { status: 200 },
+      { networkError: true },
+      { status: 200 },
+      { status: 200 },
+      { status: 200 },
+    ])
+    await uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 })
+    expect(instances.map((i) => i.body.size)).toEqual([4, 4, 4, 4, 2])
+  })
+
+  it('gives up after three whole-upload attempts, each restarting at chunk 0', async () => {
+    const instances = scriptedXhr([{ networkError: true }, { networkError: true }, { networkError: true }])
     await expect(uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 }))
       .rejects.toThrow('Network error during upload')
+    expect(instances).toHaveLength(3)
+    expect(instances.every((i) => i.headers['X-File-Chunk-Offset'] === '0')).toBe(true)
   })
 
   it('does not retry a 4xx and surfaces its message and status', async () => {
@@ -345,6 +362,30 @@ describe('resources API', () => {
     await expect(uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 }))
       .rejects.toMatchObject({ status: 409, message: 'already exists' })
     expect(instances).toHaveLength(1)
+    // First-attempt 409 must never trigger the "did the previous attempt
+    // already finish?" listing check — that only applies to a restart.
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('treats a 409 on a restarted chunk 0 as success when the target already matches', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ files: [{ name: 'big.bin', size: 10 }] }),
+    })
+    const instances = scriptedXhr([{ status: 200 }, { status: 200 }, { networkError: true }, { status: 409, body: '{"message":"already exists"}' }])
+    await expect(uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 })).resolves.toBeUndefined()
+    expect(instances).toHaveLength(4)
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('rethrows a 409 on a restarted chunk 0 when the listed target size does not match', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ files: [{ name: 'big.bin', size: 7 }] }),
+    })
+    scriptedXhr([{ status: 200 }, { status: 200 }, { networkError: true }, { status: 409, body: '{"message":"already exists"}' }])
+    await expect(uploadFile('home', '/big.bin', new File(['0123456789'], 'big.bin'), null, { chunkSize: 4 }))
+      .rejects.toMatchObject({ status: 409, message: 'already exists' })
   })
 
   it('aborts an in-flight chunk and rejects with AbortError', async () => {

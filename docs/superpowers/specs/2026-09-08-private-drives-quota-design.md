@@ -232,6 +232,14 @@ Admins always get `unlimited: true`. A user with no `home` scope at all gets
   `X-File-Total-Size` when present (FBQ's own web UI does chunk), but does not track
   partial chunk state across requests with byte-level precision — acceptable because
   this app's own UI is the only sanctioned upload path being sized precisely.
+  **Update (2026-09-09):** the "never chunks" premise above is no longer true —
+  see `docs/superpowers/specs/2026-09-09-chunked-uploads-design.md`. Files over
+  10 MiB (`CHUNK_SIZE`, `frontend/src/components/chunkPlan.js`) now go up in
+  chunks on the same endpoint. The gate (`docker/nasapi/gate.go`) pre-checks the
+  announced whole-file total (`X-File-Total-Size`) against the limit on chunk 0
+  before any byte is written, and still reserves per chunk from `Content-Length`
+  as before — so this paragraph's accounting caveat now also covers this app's
+  own UI, not just FBQ's.
 - **FBQ's own LAN UI (`:30334`) bypassing the gate.** An admin (or anyone on the LAN)
   hitting FBQ's web UI directly reaches FBQ without going through nginx or `nasapi` at
   all, so quota is not enforced there. This is accepted as an admin-only fallback

@@ -1,7 +1,9 @@
 // Cloudflare caps a single request body at 100 MB (free plan), so anything
 // bigger goes to FileBrowser Quantum in chunks on the same POST endpoint,
-// using its X-File-Chunk-Offset / X-File-Total-Size protocol.
-export const CHUNK_SIZE = 25 * 1024 * 1024
+// using its X-File-Chunk-Offset / X-File-Total-Size protocol. Chunks are
+// kept well under that cap so one chunk fits a slow home uplink inside
+// Cloudflare's ~100 s origin timeout.
+export const CHUNK_SIZE = 10 * 1024 * 1024
 export const MAX_CHUNK_ATTEMPTS = 3
 
 export function shouldChunk(size, chunkSize = CHUNK_SIZE) {
@@ -21,8 +23,11 @@ export function overallProgress(offset, loaded, total) {
   return Math.min(100, Math.round(((offset + loaded) / total) * 100))
 }
 
-// Re-sending a chunk at the same offset is idempotent on FBQ's side (it
-// seeks and overwrites), so transient failures are worth another try.
+// A network error or 5xx during a chunk body is worth another try — but not
+// at the same offset: FBQ deletes the temp file when a chunk body fails
+// mid-stream (see resources.js), so the caller restarts the whole upload
+// from offset 0 rather than resuming here. This just decides whether the
+// error is transient enough to retry at all.
 export function isRetryable(err, attempt, max = MAX_CHUNK_ATTEMPTS) {
   if (attempt >= max) return false
   if (err?.name === 'AbortError') return false

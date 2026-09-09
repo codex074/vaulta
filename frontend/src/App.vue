@@ -175,12 +175,16 @@ async function handleFiles(items) {
         try {
           await deleteItem(source, fullPath)
         } catch {
-          // Nothing to clean up, or it will show in the listing for the user to handle.
+          // Nothing to clean up, or the delete itself failed — either way,
+          // partials are hidden from listings (loadDirectory filters
+          // isPartialUpload), so cleanup below must not be skipped or a
+          // ".uploading.tmp" would sit invisibly forever.
         }
         await removePartialUploads(source, fullPath)
       } else {
         entry.status = 'error'
         entry.message = err.message || 'Failed'
+        await removePartialUploads(source, fullPath)
       }
     }
   }

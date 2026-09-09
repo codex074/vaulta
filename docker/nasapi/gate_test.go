@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -443,6 +444,26 @@ func TestGateLaterChunkIsNotPrechecked(t *testing.T) {
 	}
 	if len(fb.recorded()) != 1 {
 		t.Fatalf("FBQ received %d uploads, want 1", len(fb.recorded()))
+	}
+}
+
+// TestGateChunkZeroOverflowSafePrecheckRejects guards against `used + total`
+// overflowing int64 and wrapping negative, which would slip a wildly
+// oversized announced total past the precheck. math.MaxInt64 plus any
+// nonzero `used` overflows; the safe form (`total > limit - used`) never
+// adds two potentially-huge values together.
+func TestGateChunkZeroOverflowSafePrecheckRejects(t *testing.T) {
+	user := nonAdminHomeUser(7, "alice")
+	server, fb, homePath := newGateTestServer(t, user, 500)
+	writeFile(t, homePath, "alice/existing.bin", 1) // used > 0, so used+total can overflow
+
+	w := gateRequest(t, server.handler(), http.MethodPost, "/api/resources?path=%2Fbig.bin&source=home&override=false",
+		strings.NewReader("0123456789"), map[string]string{"X-File-Chunk-Offset": "0", "X-File-Total-Size": strconv.FormatInt(math.MaxInt64, 10)})
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want 413 (overflow must not bypass the precheck); body %s", w.Code, w.Body.String())
+	}
+	if len(fb.recorded()) != 0 {
+		t.Fatalf("FBQ received %d uploads, want 0", len(fb.recorded()))
 	}
 }
 

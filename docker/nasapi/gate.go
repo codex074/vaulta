@@ -144,7 +144,10 @@ func (s *apiServer) gateUpload(w http.ResponseWriter, r *http.Request) {
 			writeMessage(w, http.StatusBadGateway, "File service unavailable.")
 			return
 		}
-		if used+total > record.LimitBytes {
+		// total > limit - used, not used+total > limit: the addition form
+		// overflows int64 (wraps negative) for a maliciously huge announced
+		// total, which would slip the precheck entirely.
+		if total > record.LimitBytes-used {
 			io.Copy(io.Discard, r.Body)
 			writeQuotaExceeded(w, used, record.LimitBytes, total)
 			return
