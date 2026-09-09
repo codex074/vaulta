@@ -304,7 +304,10 @@ export async function renewToken() {
     authApi.logout.mockResolvedValue()
     const store = useAuthStore()
     const t0 = 5_000_000_000
+    vi.useFakeTimers()
+    vi.setSystemTime(t0) // signIn stamps Date.now(); anchor it so recordActivity(t0) is a no-op
     await store.signIn('u', 'p')
+    vi.useRealTimers()
     store.recordActivity(t0)
     expect(store.enforceIdle(t0 + 3_600_000)).toBe(false)
     expect(store.user).not.toBeNull()
