@@ -186,13 +186,16 @@ function onOfficeLoadError() {
 .backdrop { position: fixed; inset: 0; background: rgba(15, 18, 25, 0.75); display: flex; align-items: center; justify-content: center; z-index: 30; }
 .frame { position: relative; max-width: 85vw; max-height: 85vh; max-height: 85dvh; background: var(--bg-elevated); border-radius: var(--radius); padding: 20px; display: flex; align-items: center; justify-content: center; }
 .frame img { max-width: 100%; max-height: 75vh; max-height: 75dvh; }
-/* Size caps apply only while the player sits inside the frame. Plyr marks
-   both native and fallback fullscreen with .plyr--fullscreen-active; the
-   caps must not follow the player into fullscreen, or the video stays a
-   75dvh box on a black screen. */
-.frame :deep(.plyr:not(.plyr--fullscreen-active)) { max-width: 80vw; max-height: 75vh; max-height: 75dvh; }
-.frame :deep(.plyr:not(.plyr--fullscreen-active) .plyr__video-wrapper) { max-height: 75vh; max-height: 75dvh; }
-.frame :deep(.plyr:not(.plyr--fullscreen-active) video) { max-height: 75vh; max-height: 75dvh; }
+/* Size caps apply only while the player sits inside the frame. Plyr has no
+   "fullscreen active" class: native fullscreen is only visible as the
+   :fullscreen pseudo-class on .plyr, and the CSS fallback (no Fullscreen
+   API) as .plyr--fullscreen-fallback. The browser clears max-width/height on
+   the fullscreen element itself but not on its descendants, so the wrapper
+   and <video> caps must be excluded too, or "fullscreen" is a 75dvh box on a
+   black screen. tests/components/lightboxPlyrClasses.test.js guards this. */
+.frame :deep(.plyr:not(:fullscreen):not(.plyr--fullscreen-fallback)) { max-width: 80vw; max-height: 75vh; max-height: 75dvh; }
+.frame :deep(.plyr:not(:fullscreen):not(.plyr--fullscreen-fallback) .plyr__video-wrapper) { max-height: 75vh; max-height: 75dvh; }
+.frame :deep(.plyr:not(:fullscreen):not(.plyr--fullscreen-fallback) video) { max-height: 75vh; max-height: 75dvh; }
 
 @media (max-width: 640px) {
   .frame { max-width: 94vw; padding: 12px; }
